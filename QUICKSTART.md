@@ -18,15 +18,22 @@ npm run build
 npm run deploy
 npm run create-market
 npm run place-bet
-npm run resolve-market
+npm run keeper
 npm run claim
 ```
 
 What to expect:
 - Deploy prints new contract address.
 - Create writes market ids to `scripts/markets.json`.
-- Resolve sends `getRequestDeposit() + 1.2 STT` by default.
+- Create includes resolver bounty fee (`0.02 STT` default).
+- Keeper resolves expired markets autonomously.
 - Claim returns payout/refund depending on outcome.
+
+Manual resolve alternative:
+
+```bash
+npm run resolve-market
+```
 
 ## 2) Optional: Resolve Specific Market
 
@@ -51,3 +58,5 @@ python3 -m http.server 8080 --bind 0.0.0.0
 ```
 
 Open `http://localhost:8080`, connect wallet, set contract address from `scripts/deployed.json`, then create -> bet -> resolve -> claim.
+
+UI note: market creation includes bounty fee, and resolve sends deposit + top-up.

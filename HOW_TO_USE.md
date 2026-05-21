@@ -41,6 +41,7 @@ npm run create-market
 
 - Quick mode default: creates 1 market with 20-second deadline.
 - Full mode: `FULL_DEMO=true npm run create-market`.
+- Market creation sends a bounty fee (default `0.02 STT`, override with `CREATION_FEE_STT`).
 
 3. Place bets
 
@@ -60,6 +61,15 @@ npm run resolve-market
 - Default resolve value is `getRequestDeposit() + 1.2 STT`.
 - Optional: `RESOLVE_TOPUP_STT=0.8 npm run resolve-market`.
 - Optional market: `MARKET_ID=2 npm run resolve-market`.
+
+4b. Autonomous resolve with keeper (agent loop)
+
+```bash
+npm run keeper
+```
+
+- Keeper scans markets continuously, resolves expired `Open` markets, and collects bounty.
+- Optional scan interval: `KEEPER_SCAN_MS=5000 npm run keeper`.
 
 5. Claim payout/refund
 
@@ -83,9 +93,11 @@ python3 -m http.server 8080 --bind 0.0.0.0
 4. Paste deployed address from `scripts/deployed.json` and click `Save Address`.
 5. Create market.
    - Use `180` seconds if you need more signing time.
+   - Creation includes bounty fee for resolver incentives.
 6. Load market snapshot and note the market ID.
 7. Place bet using that exact market ID.
 8. After deadline passes, click `Resolve Market (LLM)`.
+   - Or run `npm run keeper` in terminal and let it resolve autonomously.
 9. Reload snapshot until outcome changes from `Open`.
 10. Click `Claim Winnings` using the same market ID.
 
@@ -150,6 +162,7 @@ npm run create-market
 
 - Modo rapido por defecto: crea 1 mercado con deadline de 20 segundos.
 - Modo completo: `FULL_DEMO=true npm run create-market`.
+- La creacion envia fee de bounty (default `0.02 STT`, override `CREATION_FEE_STT`).
 
 3. Apostar
 
@@ -169,6 +182,15 @@ npm run resolve-market
 - El valor por defecto es `getRequestDeposit() + 1.2 STT`.
 - Opcional: `RESOLVE_TOPUP_STT=0.8 npm run resolve-market`.
 - Mercado especifico: `MARKET_ID=2 npm run resolve-market`.
+
+4b. Resolucion autonoma con keeper (bucle agente)
+
+```bash
+npm run keeper
+```
+
+- El keeper escanea mercados continuamente, resuelve los vencidos en `Open`, y cobra bounty.
+- Intervalo opcional: `KEEPER_SCAN_MS=5000 npm run keeper`.
 
 5. Reclamar payout/reembolso
 
@@ -192,9 +214,11 @@ python3 -m http.server 8080 --bind 0.0.0.0
 4. Pega la direccion desplegada desde `scripts/deployed.json` y pulsa `Save Address`.
 5. Crea mercado.
    - Usa `180` segundos si necesitas mas tiempo para firmar.
+   - La creacion incluye fee bounty para incentivar al resolver.
 6. Carga el snapshot y anota el market ID.
 7. Apuesta usando ese mismo market ID.
 8. Cuando pase el deadline, pulsa `Resolve Market (LLM)`.
+   - O ejecuta `npm run keeper` en terminal para resolucion autonoma.
 9. Recarga snapshot hasta que outcome deje de ser `Open`.
 10. Pulsa `Claim Winnings` con el mismo market ID.
 
