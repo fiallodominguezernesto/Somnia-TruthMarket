@@ -6,7 +6,14 @@ Use this if you want the fastest end-to-end verification.
 
 - Run in WSL Ubuntu
 - `.env` exists with `PRIVATE_KEY`
+- `.env` includes `LLM_AGENT_ID` (real LLM Inference agent ID)
 - Wallet funded with testnet STT
+
+Optional pre-check (no deployment):
+
+```bash
+npm run sim-platform
+```
 
 ## 1) One-pass Script Flow
 

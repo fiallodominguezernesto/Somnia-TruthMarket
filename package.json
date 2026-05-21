@@ -12,7 +12,8 @@
     "resolve-market": "hardhat run scripts/resolveMarket.ts --network somniaTestnet",
     "keeper": "hardhat run scripts/keeper.ts --network somniaTestnet",
     "claim": "hardhat run scripts/claim.ts --network somniaTestnet",
-    "diagnose": "hardhat run scripts/diagnose.ts --network somniaTestnet"
+    "diagnose": "hardhat run scripts/diagnose.ts --network somniaTestnet",
+    "sim-platform": "hardhat run scripts/simPlatform.ts --network somniaTestnet"
   },
   "keywords": [],
   "author": "",

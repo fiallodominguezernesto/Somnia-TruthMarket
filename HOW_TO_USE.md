@@ -15,6 +15,15 @@ Esta guia explica como ejecutar el proyecto end-to-end usando scripts y UI.
 - Ensure `.env` exists with:
   - `PRIVATE_KEY=0x...`
   - `SOMNIA_RPC_URL=https://api.infra.testnet.somnia.network`
+  - `LLM_AGENT_ID=<real LLM Inference ID>`
+
+Get `LLM_AGENT_ID` from `https://agents.testnet.somnia.network` (LLM Inference -> Solidity tab).
+
+Optional validation before deploy:
+
+```bash
+npm run sim-platform
+```
 
 Commands:
 
@@ -39,7 +48,7 @@ npm run deploy
 npm run create-market
 ```
 
-- Quick mode default: creates 1 market with 20-second deadline.
+- Quick mode default: creates 1 market with 60-second deadline.
 - Full mode: `FULL_DEMO=true npm run create-market`.
 - Market creation sends a bounty fee (default `0.02 STT`, override with `CREATION_FEE_STT`).
 
@@ -136,6 +145,15 @@ You will see request payload details, agent id, per-agent budget, and emitted re
 - Asegura que exista `.env` con:
   - `PRIVATE_KEY=0x...`
   - `SOMNIA_RPC_URL=https://api.infra.testnet.somnia.network`
+  - `LLM_AGENT_ID=<ID real de LLM Inference>`
+
+Obtiene `LLM_AGENT_ID` desde `https://agents.testnet.somnia.network` (LLM Inference -> pestaña Solidity).
+
+Validacion opcional antes de deploy:
+
+```bash
+npm run sim-platform
+```
 
 Comandos:
 
@@ -160,7 +178,7 @@ npm run deploy
 npm run create-market
 ```
 
-- Modo rapido por defecto: crea 1 mercado con deadline de 20 segundos.
+- Modo rapido por defecto: crea 1 mercado con deadline de 60 segundos.
 - Modo completo: `FULL_DEMO=true npm run create-market`.
 - La creacion envia fee de bounty (default `0.02 STT`, override `CREATION_FEE_STT`).
 

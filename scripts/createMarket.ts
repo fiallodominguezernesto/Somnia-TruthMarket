@@ -15,7 +15,7 @@ const QUESTIONS = [
 
 const QUICK_DEMO_QUESTION = "2 + 2 equals 4.";
 
-const DEADLINE_SECONDS = 20;
+const DEADLINE_SECONDS = 60;
 
 // Must be >= MIN_CREATION_FEE in the contract. Funds the resolver bounty.
 const CREATION_FEE_STT = process.env.CREATION_FEE_STT ?? "0.02";

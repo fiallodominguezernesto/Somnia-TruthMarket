@@ -69,6 +69,8 @@ const truthMarketAbi = [
       { name: "noPool", type: "uint256" },
       { name: "outcome", type: "uint8" },
       { name: "requestId", type: "uint256" },
+      { name: "bounty", type: "uint256" },
+      { name: "resolver", type: "address" },
     ],
   },
   {
@@ -109,6 +111,13 @@ const OUTCOMES = ["Open", "YES", "NO", "UNKNOWN"];
 // Too little here makes the agent fail and the market resolves UNKNOWN.
 const RESOLVE_TOPUP = parseEther("1.2");
 
+// Minimum creation fee enforced by the contract (MIN_CREATION_FEE). The fee
+// becomes the resolver bounty for that market.
+const MIN_CREATION_FEE = parseEther("0.02");
+
+// Auto-refresh polling interval for the keeper-watch view.
+const AUTO_REFRESH_MS = 5000;
+
 const publicClient = createPublicClient({
   chain: somniaTestnet,
   transport: http(SOMNIA_RPC),
@@ -125,12 +134,15 @@ const els = {
   address: $("contractAddress"),
   question: $("question"),
   deadlineSeconds: $("deadlineSeconds"),
+  feeAmount: $("feeAmount"),
   betMarketId: $("betMarketId"),
   side: $("side"),
   betAmount: $("betAmount"),
   actionMarketId: $("actionMarketId"),
   inspectMarketId: $("inspectMarketId"),
   marketView: $("marketView"),
+  autoRefreshBtn: $("autoRefreshBtn"),
+  refreshState: $("refreshState"),
   log: $("log"),
 };
 
@@ -208,10 +220,12 @@ $("createBtn").addEventListener("click", async () => {
     if (!question) throw new Error("Question cannot be empty.");
     const secs = Number(els.deadlineSeconds.value);
     if (!Number.isFinite(secs) || secs < 10) throw new Error("Deadline seconds must be >= 10.");
+    const fee = parseEther(els.feeAmount.value || "0.02");
+    if (fee < MIN_CREATION_FEE) throw new Error("Bounty must be at least 0.02 STT.");
     const deadline = BigInt(Math.floor(Date.now() / 1000) + secs);
-    const hash = await contract.write.createMarket([question, deadline], { account });
+    const hash = await contract.write.createMarket([question, deadline], { account, value: fee });
     await waitTx(hash);
-    log("Market created.");
+    log(`Market created with ${formatEther(fee)} STT resolver bounty.`);
   } catch (error) {
     log(`Create failed: ${error.message}`);
   }
@@ -265,41 +279,114 @@ $("claimBtn").addEventListener("click", async () => {
   }
 });
 
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+function resolutionStatus(outcome, requestId, deadline, resolver) {
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  if (Number(outcome) !== 0) {
+    const by = resolver && resolver !== ZERO_ADDRESS ? ` (resolved by ${resolver})` : "";
+    return `Settled${by}`;
+  }
+  if (requestId !== 0n) return "Resolution requested — awaiting LLM callback";
+  if (deadline > 0n && now >= deadline) return "Expired — awaiting keeper/agent to resolve";
+  return "Open — accepting bets";
+}
+
+async function loadMarket(marketId) {
+  const contract = getContractClient();
+  const market = await contract.read.markets([marketId]);
+
+  let yesBet = 0n;
+  let noBet = 0n;
+  if (account) {
+    [yesBet, noBet] = await Promise.all([
+      contract.read.yesBets([marketId, account]),
+      contract.read.noBets([marketId, account]),
+    ]);
+  }
+
+  const [question, deadline, yesPool, noPool, outcome, requestId, bounty, resolver] = market;
+  const snapshot = {
+    marketId: marketId.toString(),
+    question,
+    status: resolutionStatus(outcome, requestId, deadline, resolver),
+    deadlineLocal: new Date(Number(deadline) * 1000).toLocaleString(),
+    yesPoolSTT: formatEther(yesPool),
+    noPoolSTT: formatEther(noPool),
+    totalPoolSTT: formatEther(yesPool + noPool),
+    outcome: OUTCOMES[Number(outcome)] || "Unknown",
+    bountySTT: formatEther(bounty),
+    resolver: resolver === ZERO_ADDRESS ? "none yet" : resolver,
+    requestId: requestId.toString(),
+    account: account || "not connected",
+    yourYesBetSTT: formatEther(yesBet),
+    yourNoBetSTT: formatEther(noBet),
+  };
+
+  els.marketView.textContent = JSON.stringify(snapshot, null, 2);
+  return { outcome: Number(outcome), requestId };
+}
+
 $("inspectBtn").addEventListener("click", async () => {
   try {
-    const contract = getContractClient();
     const marketId = BigInt(els.inspectMarketId.value);
-    const market = await contract.read.markets([marketId]);
-
-    let yesBet = 0n;
-    let noBet = 0n;
-    if (account) {
-      [yesBet, noBet] = await Promise.all([
-        contract.read.yesBets([marketId, account]),
-        contract.read.noBets([marketId, account]),
-      ]);
-    }
-
-    const [question, deadline, yesPool, noPool, outcome, requestId] = market;
-    const snapshot = {
-      marketId: marketId.toString(),
-      question,
-      deadlineUnix: deadline.toString(),
-      deadlineLocal: new Date(Number(deadline) * 1000).toLocaleString(),
-      yesPoolSTT: formatEther(yesPool),
-      noPoolSTT: formatEther(noPool),
-      totalPoolSTT: formatEther(yesPool + noPool),
-      outcome: OUTCOMES[Number(outcome)] || "Unknown",
-      requestId: requestId.toString(),
-      account: account || "not connected",
-      yourYesBetSTT: formatEther(yesBet),
-      yourNoBetSTT: formatEther(noBet),
-    };
-
-    els.marketView.textContent = JSON.stringify(snapshot, null, 2);
+    await loadMarket(marketId);
     log(`Loaded market #${marketId}.`);
   } catch (error) {
     log(`Load failed: ${error.message}`);
+  }
+});
+
+let autoRefreshTimer = null;
+let lastSeenOutcome = null;
+
+function stopAutoRefresh() {
+  if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+  autoRefreshTimer = null;
+  lastSeenOutcome = null;
+  els.autoRefreshBtn.textContent = "Auto-refresh: OFF";
+  els.refreshState.textContent = "Turn on auto-refresh to watch the keeper resolve this market live.";
+}
+
+function startAutoRefresh() {
+  let marketId;
+  try {
+    requireAddress();
+    marketId = BigInt(els.inspectMarketId.value);
+  } catch (error) {
+    log(`Auto-refresh failed: ${error.message}`);
+    return;
+  }
+
+  els.autoRefreshBtn.textContent = "Auto-refresh: ON";
+  els.refreshState.textContent = `Watching market #${marketId} every ${AUTO_REFRESH_MS / 1000}s for autonomous resolution...`;
+  log(`Auto-refresh ON for market #${marketId}.`);
+
+  const tick = async () => {
+    try {
+      const { outcome } = await loadMarket(marketId);
+      if (lastSeenOutcome !== null && outcome !== lastSeenOutcome && outcome !== 0) {
+        log(`Market #${marketId} resolved autonomously → ${OUTCOMES[outcome] || outcome}`);
+        els.refreshState.textContent = `Market #${marketId} settled → ${OUTCOMES[outcome] || outcome}. Auto-refresh stopped.`;
+        stopAutoRefresh();
+        return;
+      }
+      lastSeenOutcome = outcome;
+    } catch (error) {
+      log(`Auto-refresh tick failed: ${error.message}`);
+    }
+  };
+
+  tick();
+  autoRefreshTimer = setInterval(tick, AUTO_REFRESH_MS);
+}
+
+els.autoRefreshBtn.addEventListener("click", () => {
+  if (autoRefreshTimer) {
+    stopAutoRefresh();
+    log("Auto-refresh OFF.");
+  } else {
+    startAutoRefresh();
   }
 });
 

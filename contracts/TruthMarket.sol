@@ -4,10 +4,18 @@ pragma solidity ^0.8.20;
 import "./interfaces/IAgentRequester.sol";
 
 contract TruthMarket {
-    uint256 constant LLM_AGENT_ID = 12847293847561029384;
+    // Real LLM Inference agent ID from the Somnia Agent Explorer
+    // (https://agents.testnet.somnia.network). Set at deploy time — using an
+    // unregistered ID makes platform.createRequest revert with no reason.
+    uint256 public immutable llmAgentId;
     address constant PLATFORM = 0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776;
     uint256 constant MIN_BET = 0.01 ether;
     uint256 constant MIN_CREATION_FEE = 0.02 ether;
+
+    constructor(uint256 _llmAgentId) {
+        require(_llmAgentId != 0, "Agent ID required");
+        llmAgentId = _llmAgentId;
+    }
 
     enum Outcome { Open, YES, NO, UNKNOWN }
 
@@ -89,7 +97,7 @@ contract TruthMarket {
         );
 
         uint256 reqId = platform.createRequest{value: msg.value}(
-            LLM_AGENT_ID,
+            llmAgentId,
             address(this),
             this.handleResolution.selector,
             payload

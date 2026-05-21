@@ -17,7 +17,7 @@ Resolution is **permissionless and incentivized**: each market is created with a
 - Network: Somnia Testnet (Chain ID `50312`)
 - RPC: `https://api.infra.testnet.somnia.network`
 - Platform contract: `0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776`
-- LLM Inference Agent ID used by contract: `12847293847561029384`
+- LLM Inference Agent ID: configured at deploy time via `LLM_AGENT_ID` in `.env`
 
 ## Tech Stack
 
@@ -36,6 +36,7 @@ Resolution is **permissionless and incentivized**: each market is created with a
 - `scripts/keeper.ts` - autonomous resolver agent: scans for expired markets and resolves them, earning the bounty
 - `scripts/claim.ts` - claim winnings or refunds
 - `scripts/diagnose.ts` - decode payload + inspect request telemetry for a resolve tx
+- `scripts/simPlatform.ts` - dry-run platform request simulation to validate `LLM_AGENT_ID`
 - `frontend/index.html` - minimal UI
 - `frontend/app.js` - browser logic with viem CDN
 
@@ -61,6 +62,15 @@ Set at least:
 
 - `PRIVATE_KEY=0x...`
 - `SOMNIA_RPC_URL=https://api.infra.testnet.somnia.network`
+- `LLM_AGENT_ID=...` — the real LLM Inference agent ID
+
+Get the real `LLM_AGENT_ID` from the Agent Explorer: open `https://agents.testnet.somnia.network`, select the **LLM Inference** agent, open the **Solidity** tab, and copy the `agentId`. A placeholder/unregistered ID makes `resolveMarket` revert with no reason when it calls `platform.createRequest`. The contract reads this ID at deploy time (constructor arg), so set it before `npm run deploy`.
+
+Verify an agent ID is valid before deploying (no funds spent):
+
+```bash
+LLM_AGENT_ID=<id> npm run sim-platform
+```
 
 Fund the wallet from faucet:
 
@@ -82,6 +92,7 @@ npm run build
 - `npm run keeper` - run the autonomous resolver agent (continuous loop)
 - `npm run claim` - claim payout/refund
 - `npm run diagnose` - inspect resolve tx and decode request internals
+- `npm run sim-platform` - dry-run `platform.createRequest` using your current `LLM_AGENT_ID`
 
 ## Script Flow (Detailed)
 
@@ -102,7 +113,7 @@ npm run create-market
 ```
 
 Behavior:
-- Quick mode default: creates 1 market with 20-second deadline
+- Quick mode default: creates 1 market with 60-second deadline
 - Full mode: `FULL_DEMO=true npm run create-market` creates 3 factual markets
 - IDs written to `scripts/markets.json`
 - Each market is created with a bounty (default `0.02 STT`, override with `CREATION_FEE_STT`). The contract requires at least `MIN_CREATION_FEE` (`0.02 STT`). This bounty is paid to whoever resolves the market.
@@ -149,7 +160,7 @@ Behavior:
 - Skips markets already being resolved; rechecks if a callback is slow
 - Runs continuously until stopped (`Ctrl+C`)
 
-This is the loop to record for the demo video: create + bet, then start the keeper and show markets settling with no human intervention.
+This is the main autonomous operating loop: create + bet, then start keeper and let markets settle without manual resolve calls.
 
 5) Claim
 
@@ -179,9 +190,10 @@ Open in browser:
 UI sequence:
 - Connect wallet
 - Paste deployed contract address from `scripts/deployed.json`
-- Create market (20s is default, increase to 120-180s if you need more signing time)
+- Create market (60s default, increase to 120-180s if you need more signing time)
 - Place bet using the same market ID
-- Resolve after deadline (UI also sends deposit + `1.2 STT` top-up)
+- Optional manual resolve after deadline (UI sends deposit + `1.2 STT` top-up)
+- Or run `npm run keeper` and watch autonomous settlement (UI supports auto-refresh)
 - Claim using the same market ID after outcome is not `Open`
 
 ## Diagnosing UNKNOWN Outcomes
