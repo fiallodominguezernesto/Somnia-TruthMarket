@@ -110,7 +110,7 @@ async function main() {
     abi: PLATFORM_ABI,
     functionName: "getRequestDeposit",
   });
-  const topupStt = process.env.RESOLVE_TOPUP_STT ?? "0.15";
+  const topupStt = process.env.RESOLVE_TOPUP_STT ?? "1.2";
   const topup = parseEther(topupStt);
   const totalValue = deposit + topup;
 

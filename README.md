@@ -103,7 +103,7 @@ FULL_DEMO=true npm run place-bet
 npm run resolve-market
 ```
 
-By default, resolve sends `getRequestDeposit() + 0.15 STT` to improve success rate for agent execution.
+By default, resolve sends `getRequestDeposit() + 1.2 STT` to improve success rate for agent execution.
 Override with:
 
 ```bash
