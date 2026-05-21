@@ -86,3 +86,14 @@ interface IAgentRequesterHandler {
         Request memory details
     ) external;
 }
+
+// LLM Inference base agent. createRequest payload must be function calldata
+// (selector + args), not plain abi.encode bytes.
+interface ILLMAgent {
+    function inferString(
+        string calldata prompt,
+        string calldata system,
+        bool chainOfThought,
+        string[] calldata allowedValues
+    ) external returns (string memory response);
+}

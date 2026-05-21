@@ -98,13 +98,16 @@ contract TruthMarket {
         allowed[0] = "YES";
         allowed[1] = "NO";
         allowed[2] = "UNKNOWN";
-        bytes memory payload = abi.encode(
+        // Payload = calldata for inferString(prompt, system, chainOfThought, allowedValues)
+        bytes memory payload = abi.encodeWithSelector(
+            ILLMAgent.inferString.selector,
             string.concat(
-                "Is this statement factually true? Reply with exactly one token: YES, NO, or UNKNOWN. Statement: ",
+                "Is the following statement factually true? Answer YES, NO, or UNKNOWN. Statement: ",
                 m.question
             ),
-            allowed,
-            false
+            "You are a precise fact-checking oracle. Respond with exactly one of the allowed values.",
+            false,
+            allowed
         );
 
         uint256 reqId = platform.createRequest{value: msg.value}(
