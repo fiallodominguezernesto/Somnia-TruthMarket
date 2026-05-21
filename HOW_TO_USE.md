@@ -42,6 +42,11 @@ npm run build
 npm run deploy
 ```
 
+Expected output (minimum):
+- `Deploying from: 0x...`
+- `TruthMarket deployed at: 0x...`
+- `Saved -> scripts/deployed.json`
+
 2. Create market(s)
 
 ```bash
@@ -52,6 +57,11 @@ npm run create-market
 - Full mode: `FULL_DEMO=true npm run create-market`.
 - Market creation sends a bounty fee (default `0.02 STT`, override with `CREATION_FEE_STT`).
 
+Expected output (minimum):
+- `Market #...`
+- `Deadline: ... (+60s)`
+- `Saved -> scripts/markets.json`
+
 3. Place bets
 
 ```bash
@@ -60,6 +70,9 @@ npm run place-bet
 
 - Quick mode default: one YES bet on first market.
 - Full mode: `FULL_DEMO=true npm run place-bet`.
+
+Expected output (minimum):
+- `✅ Market #... -> ...`
 
 4. Resolve market
 
@@ -80,6 +93,12 @@ npm run keeper
 - Keeper scans markets continuously, resolves expired `Open` markets, and collects bounty.
 - Optional scan interval: `KEEPER_SCAN_MS=5000 npm run keeper`.
 
+Expected output (minimum):
+- `TruthMarket keeper started`
+- `Market #... expired. Resolving autonomously...`
+- `resolveMarket tx 0x...`
+- `Market #... settled -> YES/NO/UNKNOWN`
+
 5. Claim payout/refund
 
 ```bash
@@ -87,6 +106,10 @@ npm run claim
 ```
 
 - Optional market: `MARKET_ID=2 npm run claim`.
+
+Expected output (minimum):
+- `Outcome: ...`
+- `✅ Claimed: ... STT`
 
 ### 3) Full flow with UI
 
@@ -134,6 +157,23 @@ You will see request payload details, agent id, per-agent budget, and emitted re
 - `Nothing to claim`: no valid bet for your address on that market.
 - Repeated `UNKNOWN`: increase top-up (`RESOLVE_TOPUP_STT`).
 
+Decision flow:
+
+```text
+Bet failed?
+  -> Expired: recreate market with longer deadline (120-180s)
+  -> Not open: load correct market ID and check status
+
+Market still Open after deadline?
+  -> Is keeper running? if no, start it
+  -> If yes, wait 1-2 scan cycles
+  -> If still open, run diagnose with RESOLVE_TX
+
+Claim failed?
+  -> Check same market ID used for bet/resolve/claim
+  -> If no user stake, claim will revert with Nothing to claim
+```
+
 ---
 
 ## Guia en Espanol
@@ -172,6 +212,11 @@ npm run build
 npm run deploy
 ```
 
+Salida esperada (minima):
+- `Deploying from: 0x...`
+- `TruthMarket deployed at: 0x...`
+- `Saved -> scripts/deployed.json`
+
 2. Crear mercado(s)
 
 ```bash
@@ -182,6 +227,11 @@ npm run create-market
 - Modo completo: `FULL_DEMO=true npm run create-market`.
 - La creacion envia fee de bounty (default `0.02 STT`, override `CREATION_FEE_STT`).
 
+Salida esperada (minima):
+- `Market #...`
+- `Deadline: ... (+60s)`
+- `Saved -> scripts/markets.json`
+
 3. Apostar
 
 ```bash
@@ -190,6 +240,9 @@ npm run place-bet
 
 - Modo rapido por defecto: una apuesta YES al primer mercado.
 - Modo completo: `FULL_DEMO=true npm run place-bet`.
+
+Salida esperada (minima):
+- `✅ Market #... -> ...`
 
 4. Resolver mercado
 
@@ -210,6 +263,12 @@ npm run keeper
 - El keeper escanea mercados continuamente, resuelve los vencidos en `Open`, y cobra bounty.
 - Intervalo opcional: `KEEPER_SCAN_MS=5000 npm run keeper`.
 
+Salida esperada (minima):
+- `TruthMarket keeper started`
+- `Market #... expired. Resolving autonomously...`
+- `resolveMarket tx 0x...`
+- `Market #... settled -> YES/NO/UNKNOWN`
+
 5. Reclamar payout/reembolso
 
 ```bash
@@ -217,6 +276,10 @@ npm run claim
 ```
 
 - Mercado especifico: `MARKET_ID=2 npm run claim`.
+
+Salida esperada (minima):
+- `Outcome: ...`
+- `✅ Claimed: ... STT`
 
 ### 3) Flujo completo por UI
 
@@ -263,3 +326,20 @@ Vas a ver detalles del payload, agent id, presupuesto por agente, y eventos de r
 - Mercado sigue en `Open`: probablemente resolviste otro market ID. Resuelve el correcto.
 - `Nothing to claim`: no hay apuesta valida de tu address en ese mercado.
 - `UNKNOWN` repetido: sube el top-up (`RESOLVE_TOPUP_STT`).
+
+Flujo de decision:
+
+```text
+Falla apuesta?
+  -> Expired: recrear con deadline mayor (120-180s)
+  -> Not open: cargar market ID correcto y revisar status
+
+Sigue Open tras deadline?
+  -> Keeper corriendo? si no, arrancarlo
+  -> Si si, esperar 1-2 ciclos de scan
+  -> Si persiste, ejecutar diagnose con RESOLVE_TX
+
+Falla claim?
+  -> Verificar mismo market ID en bet/resolve/claim
+  -> Si no hay stake del usuario, claim revierte con Nothing to claim
+```

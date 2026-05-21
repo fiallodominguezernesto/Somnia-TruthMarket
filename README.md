@@ -14,6 +14,18 @@ Core behavior implemented in this repository:
 - Operational tooling for repeatable deploy/test flows and request diagnostics
 - Browser UI plus script-based execution paths for reproducible demonstrations
 
+System flow (high-level):
+
+```text
+User/Script/UI
+   -> TruthMarket.createMarket / placeBet
+   -> TruthMarket.resolveMarket
+   -> Somnia Platform.createRequest
+   -> LLM Inference Agent execution
+   -> Platform callback to TruthMarket.handleResolution
+   -> TruthMarket settles outcome + claim payout/refund
+```
+
 ## Start Here
 
 - 3-minute path: `QUICKSTART.md`
@@ -71,6 +83,19 @@ Set at least:
 - `PRIVATE_KEY=0x...`
 - `SOMNIA_RPC_URL=https://api.infra.testnet.somnia.network`
 - `LLM_AGENT_ID=...` — the real LLM Inference agent ID
+
+Environment variables reference:
+
+| Variable | Default | Used by | Purpose |
+|---|---:|---|---|
+| `PRIVATE_KEY` | none | deploy/scripts/keeper | signer wallet |
+| `SOMNIA_RPC_URL` | testnet RPC | all scripts | chain endpoint |
+| `LLM_AGENT_ID` | none | deploy/sim-platform | real LLM agent ID injected at deploy |
+| `CREATION_FEE_STT` | `0.02` | create-market | bounty amount paid by market creator |
+| `RESOLVE_TOPUP_STT` | `1.2` | resolve-market/keeper | extra value on top of platform deposit |
+| `KEEPER_SCAN_MS` | `10000` | keeper | scan interval in milliseconds |
+| `MARKET_ID` | first in `markets.json` | resolve-market/claim/diagnose | target market override |
+| `FULL_DEMO` | `false` | create-market/place-bet | full 3-market, 6-bet demo mode |
 
 Get the real `LLM_AGENT_ID` from the Agent Explorer: open `https://agents.testnet.somnia.network`, select the **LLM Inference** agent, open the **Solidity** tab, and copy the `agentId`. A placeholder/unregistered ID makes `resolveMarket` revert with no reason when it calls `platform.createRequest`. The contract reads this ID at deploy time (constructor arg), so set it before `npm run deploy`.
 
@@ -182,6 +207,40 @@ Optional specific market:
 MARKET_ID=2 npm run claim
 ```
 
+## Known Good Run
+
+Use this exact sequence for a clean autonomous run:
+
+```bash
+cd /home/ernesto/somnia
+source ~/.nvm/nvm.sh
+nvm use --lts
+npm run build
+npm run sim-platform
+npm run deploy
+npm run create-market
+npm run place-bet
+npm run keeper
+```
+
+In a second terminal after settlement:
+
+```bash
+cd /home/ernesto/somnia
+source ~/.nvm/nvm.sh
+nvm use --lts
+npm run claim
+```
+
+Expected keeper output includes:
+- `Market #... expired. Resolving autonomously ...`
+- `resolveMarket tx 0x...`
+- `Market #... settled -> YES/NO/UNKNOWN`
+
+Expected claim output includes:
+- `Outcome: ...`
+- `✅ Claimed: ... STT`
+
 ## UI Flow (Detailed)
 
 Run frontend server:
@@ -222,6 +281,16 @@ What diagnose shows:
 - `RequestCreated` telemetry from tx receipt
 - sent `agentId`, `perAgentBudget`, payload selector and decoded inferString args
 - contract events (`ResolutionText`, `MarketResolved`) after resolve block
+
+## Proof of Autonomy (Sample Run)
+
+Recent autonomous run (keeper-driven):
+
+- Contract: `0xe1808e511f1a7b53ea53591ad38162ba7c7660c1`
+- Keeper resolve tx: `0x3271d043e9ff3b8f9bcc608406d372f1622eeef8ab9da9b20173fbb2e72d78be`
+- Claim tx: `0x9f0f00d2befbffdf642096e78bbd6e56aedc0b30fc6502b3e4e3c4e6e33b8294`
+
+This run demonstrates autonomous discovery of expired markets, agent-mediated settlement, and successful payout claim.
 
 ## Common Issues
 
