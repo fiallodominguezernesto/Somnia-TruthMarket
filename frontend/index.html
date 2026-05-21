@@ -54,6 +54,16 @@
       gap: 16px;
     }
 
+    @media (min-width: 1100px) {
+      .grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .card-wide {
+        grid-column: span 2;
+      }
+    }
+
     .card { padding: 16px; }
     .card h2 { margin: 0 0 12px; font-size: 1rem; letter-spacing: 0.02em; }
 
@@ -190,7 +200,7 @@
         </div>
       </article>
 
-      <article class="card">
+      <article class="card card-wide">
         <h2>5) Market Snapshot</h2>
         <div class="row">
           <label>Market ID</label>
@@ -204,7 +214,7 @@
         </div>
       </article>
 
-      <article class="card">
+      <article class="card card-wide">
         <h2>Activity Log</h2>
         <pre id="log"></pre>
       </article>
