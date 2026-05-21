@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Somnia TruthMarket Demo</title>
+  <style>
+    :root {
+      --bg: #0d1b2a;
+      --panel: #14263a;
+      --panel-soft: #1d3550;
+      --ink: #e8f1ff;
+      --muted: #a8bed8;
+      --accent: #10b981;
+      --accent-2: #f59e0b;
+      --danger: #ef4444;
+      --line: #2f4b6a;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 700px at 90% -10%, #1f496b 0%, transparent 45%),
+        radial-gradient(900px 600px at -10% 20%, #1f6d5c 0%, transparent 40%),
+        var(--bg);
+      min-height: 100vh;
+    }
+
+    .wrap {
+      width: min(1100px, 92vw);
+      margin: 28px auto 56px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .hero, .card {
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.01));
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      backdrop-filter: blur(4px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+    }
+
+    .hero { padding: 22px; }
+    .hero h1 { margin: 0 0 8px; font-size: clamp(1.4rem, 2vw, 2rem); }
+    .hero p { margin: 0; color: var(--muted); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+
+    .card { padding: 16px; }
+    .card h2 { margin: 0 0 12px; font-size: 1rem; letter-spacing: 0.02em; }
+
+    label { display: block; margin-bottom: 8px; color: var(--muted); font-size: 0.92rem; }
+    input, select, textarea, button {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: var(--panel-soft);
+      color: var(--ink);
+      padding: 10px 12px;
+      font: inherit;
+    }
+
+    textarea { min-height: 90px; resize: vertical; }
+
+    .row { display: grid; gap: 10px; }
+    .row.two { grid-template-columns: 1fr 1fr; }
+
+    button {
+      cursor: pointer;
+      background: linear-gradient(120deg, var(--accent), #0ea5e9);
+      color: #031018;
+      font-weight: 700;
+      border: none;
+      transition: transform 0.15s ease, filter 0.15s ease;
+    }
+    button:hover { transform: translateY(-1px); filter: brightness(1.06); }
+    button.secondary { background: linear-gradient(120deg, var(--accent-2), #f97316); }
+    button.danger { background: linear-gradient(120deg, var(--danger), #f97316); color: #fff; }
+
+    .pill {
+      display: inline-block;
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin-right: 6px;
+      margin-bottom: 6px;
+    }
+
+    pre {
+      margin: 0;
+      max-height: 220px;
+      overflow: auto;
+      background: #0a1420;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      color: #b8d7ff;
+      white-space: pre-wrap;
+      font-size: 0.88rem;
+    }
+
+    .status { color: var(--muted); font-size: 0.9rem; }
+    .mono { font-family: "JetBrains Mono", Consolas, monospace; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>Somnia TruthMarket</h1>
+      <p>Autonomous micro prediction market powered by Somnia Agentic L1.</p>
+      <div style="margin-top:12px">
+        <span class="pill">Chain ID: 50312</span>
+        <span class="pill">RPC: Somnia Testnet</span>
+        <span class="pill">Outcome: YES / NO / UNKNOWN</span>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2>1) Wallet + Contract</h2>
+        <div class="row">
+          <button id="connectBtn">Connect Wallet</button>
+          <div class="status">Account: <span id="account" class="mono">not connected</span></div>
+          <label>TruthMarket Contract Address</label>
+          <input id="contractAddress" placeholder="0x..." />
+          <button id="saveAddressBtn" class="secondary">Save Address</button>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>2) Create Market</h2>
+        <div class="row">
+          <label>Question</label>
+          <textarea id="question" placeholder="Is this statement true? ..."></textarea>
+          <div class="row two">
+            <div>
+              <label>Deadline Minutes From Now</label>
+              <input id="deadlineMinutes" type="number" min="1" value="5" />
+            </div>
+            <div>
+              <label>&nbsp;</label>
+              <button id="createBtn">Create Market</button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>3) Place Bet</h2>
+        <div class="row">
+          <div class="row two">
+            <div>
+              <label>Market ID</label>
+              <input id="betMarketId" type="number" min="1" value="1" />
+            </div>
+            <div>
+              <label>Side</label>
+              <select id="side">
+                <option value="yes">YES</option>
+                <option value="no">NO</option>
+              </select>
+            </div>
+          </div>
+          <label>Amount (STT)</label>
+          <input id="betAmount" type="number" min="0.01" step="0.01" value="0.05" />
+          <button id="betBtn">Place Bet</button>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>4) Resolve + Claim</h2>
+        <div class="row">
+          <label>Market ID</label>
+          <input id="actionMarketId" type="number" min="1" value="1" />
+          <button id="resolveBtn" class="secondary">Resolve Market (LLM)</button>
+          <button id="claimBtn" class="danger">Claim Winnings</button>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>5) Market Snapshot</h2>
+        <div class="row">
+          <label>Market ID</label>
+          <input id="inspectMarketId" type="number" min="1" value="1" />
+          <button id="inspectBtn">Load Market</button>
+          <pre id="marketView">No market loaded yet.</pre>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>Activity Log</h2>
+        <pre id="log"></pre>
+      </article>
+    </section>
+  </div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
