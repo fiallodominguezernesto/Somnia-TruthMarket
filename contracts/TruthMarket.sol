@@ -30,7 +30,6 @@ contract TruthMarket {
     event MarketResolved(uint256 indexed id, Outcome outcome);
     event Claimed(uint256 indexed id, address indexed bettor, uint256 amount);
 
-    // msg.value opcional: va al contrato como treasury para financiar resoluciones
     function createMarket(string calldata question, uint256 deadline) external payable returns (uint256 id) {
         require(deadline > block.timestamp, "Past deadline");
         id = ++marketCount;

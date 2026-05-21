@@ -26,10 +26,10 @@ async function main() {
   const outcome = OUTCOMES[outcomeIdx] ?? "Unknown";
 
   console.log(`Market #${marketId}: "${question}"`);
-  console.log(`Resultado: ${outcome}`);
+  console.log(`Outcome: ${outcome}`);
 
   if (outcome === "Open") {
-    console.log("El mercado aún no está resuelto. Ejecuta resolveMarket.ts primero.");
+    console.log("Market is still open. Run resolveMarket.ts first.");
     return;
   }
 
@@ -38,19 +38,19 @@ async function main() {
     contract.read.noBets([marketId, account]),
   ]);
 
-  console.log(`\nTus apuestas:`);
+  console.log("\nYour bets:");
   console.log(`  YES: ${formatEther(yesBet)} STT`);
   console.log(`  NO:  ${formatEther(noBet)} STT`);
 
   if (yesBet === 0n && noBet === 0n) {
-    console.log("No tienes apuestas en este mercado.");
+    console.log("You have no bets in this market.");
     return;
   }
 
   const [yesPool, noPool] = [market[2] as bigint, market[3] as bigint];
   const totalPool = yesPool + noPool;
 
-  // Calcular payout estimado antes de enviar
+  // Calculate estimated payout before sending tx
   let estimatedPayout = 0n;
   if (outcome === "UNKNOWN") {
     estimatedPayout = yesBet + noBet;
@@ -61,11 +61,11 @@ async function main() {
   }
 
   if (estimatedPayout === 0n) {
-    console.log("No tienes ganancias que reclamar en este mercado.");
+    console.log("No winnings available to claim for this market.");
     return;
   }
 
-  console.log(`\nPayout estimado: ${formatEther(estimatedPayout)} STT`);
+  console.log(`\nEstimated payout: ${formatEther(estimatedPayout)} STT`);
 
   const hash = await contract.write.claim([marketId]);
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
@@ -77,7 +77,7 @@ async function main() {
   });
 
   const claimed = events[0]?.args.amount ?? estimatedPayout;
-  console.log(`\n✅ Reclamado: ${formatEther(claimed)} STT`);
+  console.log(`\n✅ Claimed: ${formatEther(claimed)} STT`);
   console.log(`Tx: ${hash}`);
 }
 

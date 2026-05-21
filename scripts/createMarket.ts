@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Hechos históricos verificables con respuesta clara para el LLM
+// Verifiable historical facts with clear LLM answers
 const QUESTIONS = [
   "Bitcoin's genesis block was mined on January 3, 2009.",          // → YES
   "Ethereum's Merge (switch to Proof of Stake) occurred in September 2022.", // → YES

@@ -14,19 +14,19 @@ async function main() {
   const publicClient = await hre.viem.getPublicClient();
   const contract = await hre.viem.getContractAt("TruthMarket", address);
 
-  // Apuestas para el demo: mayoría correcta + minoría incorrecta para mostrar distribución
+  // Demo bets: correct majority + incorrect minority to show payout distribution
   const bets: Array<{ marketId: bigint; isYes: boolean; amount: bigint; label: string }> = [
     // Market 1: "Bitcoin genesis block mined Jan 3 2009" → YES
-    { marketId: BigInt(marketIds[0]), isYes: true,  amount: parseEther("0.05"), label: "YES (correcto)" },
-    { marketId: BigInt(marketIds[0]), isYes: false, amount: parseEther("0.02"), label: "NO  (incorrecto)" },
+    { marketId: BigInt(marketIds[0]), isYes: true,  amount: parseEther("0.05"), label: "YES (correct)" },
+    { marketId: BigInt(marketIds[0]), isYes: false, amount: parseEther("0.02"), label: "NO  (wrong)" },
 
     // Market 2: "Ethereum Merge Sep 2022" → YES
-    { marketId: BigInt(marketIds[1]), isYes: true,  amount: parseEther("0.05"), label: "YES (correcto)" },
-    { marketId: BigInt(marketIds[1]), isYes: false, amount: parseEther("0.02"), label: "NO  (incorrecto)" },
+    { marketId: BigInt(marketIds[1]), isYes: true,  amount: parseEther("0.05"), label: "YES (correct)" },
+    { marketId: BigInt(marketIds[1]), isYes: false, amount: parseEther("0.02"), label: "NO  (wrong)" },
 
     // Market 3: "Vitalik created Bitcoin" → NO
-    { marketId: BigInt(marketIds[2]), isYes: false, amount: parseEther("0.05"), label: "NO  (correcto)" },
-    { marketId: BigInt(marketIds[2]), isYes: true,  amount: parseEther("0.02"), label: "YES (incorrecto)" },
+    { marketId: BigInt(marketIds[2]), isYes: false, amount: parseEther("0.05"), label: "NO  (correct)" },
+    { marketId: BigInt(marketIds[2]), isYes: true,  amount: parseEther("0.02"), label: "YES (wrong)" },
   ];
 
   for (const { marketId, isYes, amount, label } of bets) {

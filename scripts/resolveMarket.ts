@@ -18,9 +18,9 @@ const PLATFORM_ABI = [
 ] as const;
 
 const OUTCOMES = ["Open", "YES", "NO", "UNKNOWN"];
-const BLOCK_WINDOW = 1000n;   // Somnia: máx 1000 bloques por getLogs query
-const POLL_MS = 5_000;        // intervalo entre polls
-const TIMEOUT_MS = 180_000;   // 3 minutos máximo
+const BLOCK_WINDOW = 1000n;   // Somnia: max 1000 blocks per getLogs query
+const POLL_MS = 5_000;        // polling interval
+const TIMEOUT_MS = 180_000;   // 3 minute timeout
 
 async function pollResolution(
   publicClient: Awaited<ReturnType<typeof hre.viem.getPublicClient>>,
@@ -33,12 +33,12 @@ async function pollResolution(
 
   let searchFrom = startBlock;
 
-  console.log("⏳ Polling for MarketResolved (sliding window, máx 1000 bloques/query)...");
+  console.log("⏳ Polling for MarketResolved (sliding window, max 1000 blocks/query)...");
 
   while (Date.now() < deadline) {
     const latest = await publicClient.getBlockNumber();
 
-    // Sliding window: barrer todos los bloques nuevos en ventanas de 1000
+    // Sliding window: scan all new blocks in chunks of 1000
     for (let from = searchFrom; from <= latest; from += BLOCK_WINDOW) {
       const to = from + BLOCK_WINDOW - 1n > latest ? latest : from + BLOCK_WINDOW - 1n;
 
@@ -72,7 +72,7 @@ async function main() {
     readFileSync(join(__dirname, "markets.json"), "utf-8")
   );
 
-  // Usa MARKET_ID env var o el primer mercado por defecto
+  // Use MARKET_ID env var or the first market by default
   const marketId = BigInt(process.env.MARKET_ID ?? marketIds[0]);
 
   const publicClient = await hre.viem.getPublicClient();
@@ -84,21 +84,21 @@ async function main() {
   console.log(`Market #${marketId}: "${question}"`);
   console.log(`Deadline: ${new Date(Number(deadlineTs) * 1000).toLocaleString()}`);
 
-  // Esperar si el mercado todavía no expiró
+  // Wait if market is still before deadline
   const nowSec = BigInt(Math.floor(Date.now() / 1000));
   if (nowSec < deadlineTs) {
     const waitMs = Number(deadlineTs - nowSec) * 1000 + 2000;
-    console.log(`\n⏰ Mercado no expirado. Esperando ${Math.ceil(waitMs / 1000)}s...`);
+    console.log(`\n⏰ Market not expired yet. Waiting ${Math.ceil(waitMs / 1000)}s...`);
     await new Promise((r) => setTimeout(r, waitMs));
   }
 
-  // Consultar depósito requerido al platform contract
+  // Read required platform deposit
   const deposit = await publicClient.readContract({
     address: PLATFORM,
     abi: PLATFORM_ABI,
     functionName: "getRequestDeposit",
   });
-  console.log(`\nDeposit requerido: ${deposit} wei`);
+  console.log(`\nRequired deposit: ${deposit} wei`);
 
   const hash = await contract.write.resolveMarket([marketId], { value: deposit });
   console.log(`resolveMarket tx: ${hash}`);
