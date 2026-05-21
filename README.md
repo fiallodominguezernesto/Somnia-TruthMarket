@@ -212,7 +212,8 @@ MARKET_ID=2 npm run claim
 Use this exact sequence for a clean autonomous run:
 
 ```bash
-cd /home/ernesto/somnia
+PROJECT_ROOT=/path/to/your/somnia-repo
+cd "$PROJECT_ROOT"
 source ~/.nvm/nvm.sh
 nvm use --lts
 npm run build
@@ -226,7 +227,8 @@ npm run keeper
 In a second terminal after settlement:
 
 ```bash
-cd /home/ernesto/somnia
+PROJECT_ROOT=/path/to/your/somnia-repo
+cd "$PROJECT_ROOT"
 source ~/.nvm/nvm.sh
 nvm use --lts
 npm run claim

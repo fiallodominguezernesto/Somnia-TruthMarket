@@ -18,7 +18,8 @@ npm run sim-platform
 ## 1) Path A (Recommended): Autonomous Keeper Flow
 
 ```bash
-cd /home/ernesto/somnia
+PROJECT_ROOT=/path/to/your/somnia-repo
+cd "$PROJECT_ROOT"
 source ~/.nvm/nvm.sh
 nvm use --lts
 npm run build
@@ -32,7 +33,8 @@ npm run keeper
 Then, in a second terminal:
 
 ```bash
-cd /home/ernesto/somnia
+PROJECT_ROOT=/path/to/your/somnia-repo
+cd "$PROJECT_ROOT"
 source ~/.nvm/nvm.sh
 nvm use --lts
 npm run claim
@@ -71,7 +73,8 @@ This prints payload selector, agent id, per-agent budget, and resolution events.
 ## 5) Fast UI Check
 
 ```bash
-cd /home/ernesto/somnia/frontend
+PROJECT_ROOT=/path/to/your/somnia-repo
+cd "$PROJECT_ROOT/frontend"
 python3 -m http.server 8080 --bind 0.0.0.0
 ```
 

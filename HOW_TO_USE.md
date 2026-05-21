@@ -28,7 +28,8 @@ npm run sim-platform
 Commands:
 
 ```bash
-cd /home/ernesto/somnia
+PROJECT_ROOT=/path/to/your/somnia-repo
+cd "$PROJECT_ROOT"
 source ~/.nvm/nvm.sh
 nvm use --lts
 npm run build
@@ -116,7 +117,8 @@ Expected output (minimum):
 1. Start frontend server:
 
 ```bash
-cd /home/ernesto/somnia/frontend
+PROJECT_ROOT=/path/to/your/somnia-repo
+cd "$PROJECT_ROOT/frontend"
 python3 -m http.server 8080 --bind 0.0.0.0
 ```
 
@@ -198,7 +200,8 @@ npm run sim-platform
 Comandos:
 
 ```bash
-cd /home/ernesto/somnia
+PROJECT_ROOT=/path/to/your/somnia-repo
+cd "$PROJECT_ROOT"
 source ~/.nvm/nvm.sh
 nvm use --lts
 npm run build
@@ -286,7 +289,8 @@ Salida esperada (minima):
 1. Levantar servidor frontend:
 
 ```bash
-cd /home/ernesto/somnia/frontend
+PROJECT_ROOT=/path/to/your/somnia-repo
+cd "$PROJECT_ROOT/frontend"
 python3 -m http.server 8080 --bind 0.0.0.0
 ```
 
