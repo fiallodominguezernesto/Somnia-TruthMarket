@@ -15,28 +15,31 @@ async function main() {
   const publicClient = await viem.getPublicClient();
   const contract = await viem.getContractAt("TruthMarket", address);
 
-  // Demo bets: correct majority + incorrect minority to show payout distribution
-  const bets: Array<{ marketId: bigint; isYes: boolean; amount: bigint; label: string }> = [
-    // Market 1: "Bitcoin genesis block mined Jan 3 2009" → YES
-    { marketId: BigInt(marketIds[0]), isYes: true,  amount: parseEther("0.05"), label: "YES (correct)" },
-    { marketId: BigInt(marketIds[0]), isYes: false, amount: parseEther("0.02"), label: "NO  (wrong)" },
+  const fullDemo = (process.env.FULL_DEMO ?? "false").toLowerCase() === "true";
 
-    // Market 2: "Ethereum Merge Sep 2022" → YES
-    { marketId: BigInt(marketIds[1]), isYes: true,  amount: parseEther("0.05"), label: "YES (correct)" },
-    { marketId: BigInt(marketIds[1]), isYes: false, amount: parseEther("0.02"), label: "NO  (wrong)" },
-
-    // Market 3: "Vitalik created Bitcoin" → NO
-    { marketId: BigInt(marketIds[2]), isYes: false, amount: parseEther("0.05"), label: "NO  (correct)" },
-    { marketId: BigInt(marketIds[2]), isYes: true,  amount: parseEther("0.02"), label: "YES (wrong)" },
-  ];
+  // Fast mode for short deadlines: one bet per market
+  const bets: Array<{ marketId: bigint; isYes: boolean; amount: bigint; label: string }> = fullDemo
+    ? [
+        { marketId: BigInt(marketIds[0]), isYes: true, amount: parseEther("0.05"), label: "YES (correct)" },
+        { marketId: BigInt(marketIds[0]), isYes: false, amount: parseEther("0.02"), label: "NO (wrong)" },
+        { marketId: BigInt(marketIds[1]), isYes: true, amount: parseEther("0.05"), label: "YES (correct)" },
+        { marketId: BigInt(marketIds[1]), isYes: false, amount: parseEther("0.02"), label: "NO (wrong)" },
+        { marketId: BigInt(marketIds[2]), isYes: false, amount: parseEther("0.05"), label: "NO (correct)" },
+        { marketId: BigInt(marketIds[2]), isYes: true, amount: parseEther("0.02"), label: "YES (wrong)" },
+      ]
+    : [{ marketId: BigInt(marketIds[0]), isYes: true, amount: parseEther("0.05"), label: "YES" }];
 
   for (const { marketId, isYes, amount, label } of bets) {
-    const hash = await contract.write.placeBet([marketId, isYes], { value: amount });
-    await publicClient.waitForTransactionReceipt({ hash });
-    console.log(`✅ Market #${marketId} → ${label} — ${formatEther(amount)} STT  [${hash.slice(0, 10)}…]`);
+    try {
+      const hash = await contract.write.placeBet([marketId, isYes], { value: amount });
+      await publicClient.waitForTransactionReceipt({ hash });
+      console.log(`✅ Market #${marketId} → ${label} — ${formatEther(amount)} STT  [${hash.slice(0, 10)}…]`);
+    } catch (error) {
+      console.log(`⚠️ Market #${marketId} skipped (${label}): ${(error as Error).message.split("\n")[0]}`);
+    }
   }
 
-  console.log("\nBets placed. Wait for market deadline, then run resolveMarket.ts.");
+  console.log("\nBet script finished. Wait for expiry, then run resolveMarket.ts.");
 }
 
 main().catch(console.error);

@@ -70,10 +70,18 @@ npm run build
 npm run deploy
 ```
 
-2) Create 3 demo markets (5-minute deadline)
+2) Create market(s) (20-second deadline)
 
 ```bash
 npm run create-market
+```
+
+Quick mode creates one market for faster demos.
+Default quick market question is deterministic: `2 + 2 equals 4.`
+Use full market set if needed:
+
+```bash
+FULL_DEMO=true npm run create-market
 ```
 
 3) Place demo bets
@@ -82,10 +90,24 @@ npm run create-market
 npm run place-bet
 ```
 
+Quick mode places one bet on market #1 for short deadlines.
+Use full 6-bet distribution demo if needed:
+
+```bash
+FULL_DEMO=true npm run place-bet
+```
+
 4) Resolve with LLM (waits for deadline if needed)
 
 ```bash
 npm run resolve-market
+```
+
+By default, resolve sends `getRequestDeposit() + 0.15 STT` to improve success rate for agent execution.
+Override with:
+
+```bash
+RESOLVE_TOPUP_STT=0.12 npm run resolve-market
 ```
 
 Optional specific market:

@@ -13,21 +13,25 @@ const QUESTIONS = [
   "Vitalik Buterin created Bitcoin.",                               // → NO
 ];
 
-const DEADLINE_MINUTES = 5;
+const QUICK_DEMO_QUESTION = "2 + 2 equals 4.";
+
+const DEADLINE_SECONDS = 20;
 
 async function main() {
   const { viem } = await network.create();
+  const fullDemo = (process.env.FULL_DEMO ?? "false").toLowerCase() === "true";
+  const selectedQuestions = fullDemo ? QUESTIONS : [QUICK_DEMO_QUESTION];
   const { TruthMarket: address } = JSON.parse(
     readFileSync(join(__dirname, "deployed.json"), "utf-8")
   );
 
   const publicClient = await viem.getPublicClient();
   const contract = await viem.getContractAt("TruthMarket", address);
-  const deadline = BigInt(Math.floor(Date.now() / 1000) + DEADLINE_MINUTES * 60);
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + DEADLINE_SECONDS);
 
   const marketIds: string[] = [];
 
-  for (const question of QUESTIONS) {
+  for (const question of selectedQuestions) {
     const hash = await contract.write.createMarket([question, deadline]);
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
@@ -43,8 +47,11 @@ async function main() {
   }
 
   const expiry = new Date(Number(deadline) * 1000);
-  console.log(`\n⏰ Deadline: ${expiry.toLocaleTimeString()} (${DEADLINE_MINUTES} min)`);
+  console.log(`\n⏰ Deadline: ${expiry.toLocaleTimeString()} (+${DEADLINE_SECONDS}s)`);
   console.log("Run placeBet.ts now, then wait for expiry to resolve.");
+  if (!fullDemo) {
+    console.log("Tip: set FULL_DEMO=true to create all 3 markets.");
+  }
 
   writeFileSync(
     join(__dirname, "markets.json"),

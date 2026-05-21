@@ -120,7 +120,7 @@ const els = {
   account: $("account"),
   address: $("contractAddress"),
   question: $("question"),
-  deadlineMinutes: $("deadlineMinutes"),
+  deadlineSeconds: $("deadlineSeconds"),
   betMarketId: $("betMarketId"),
   side: $("side"),
   betAmount: $("betAmount"),
@@ -202,9 +202,9 @@ $("createBtn").addEventListener("click", async () => {
     const contract = getContractClient();
     const question = els.question.value.trim();
     if (!question) throw new Error("Question cannot be empty.");
-    const mins = Number(els.deadlineMinutes.value);
-    if (!Number.isFinite(mins) || mins < 1) throw new Error("Deadline minutes must be >= 1.");
-    const deadline = BigInt(Math.floor(Date.now() / 1000) + mins * 60);
+    const secs = Number(els.deadlineSeconds.value);
+    if (!Number.isFinite(secs) || secs < 10) throw new Error("Deadline seconds must be >= 10.");
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + secs);
     const hash = await contract.write.createMarket([question, deadline], { account });
     await waitTx(hash);
     log("Market created.");
