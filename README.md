@@ -2,9 +2,17 @@
 
 Autonomous micro prediction market MVP for Somnia Agentathon.
 
-Users create YES/NO factual markets, place STT bets, and resolve outcomes through Somnia Agents. After deadline, the contract sends an asynchronous LLM request and settles on-chain as `YES`, `NO`, or `UNKNOWN`.
+Somnia TruthMarket is a fully on-chain prediction workflow where users create factual YES/NO markets, fund positions with STT, and let the protocol finalize outcomes through Somnia's agent infrastructure. After each market reaches its deadline, the contract emits an asynchronous request to the LLM Inference agent and receives a callback that updates settlement state to `YES`, `NO`, or `UNKNOWN`.
 
-Resolution is **permissionless and incentivized**: each market is created with a bounty (funded by the creation fee) that is paid to whoever triggers `resolveMarket` after the deadline. Any agent can discover an expired market and resolve it for the reward — no privileged operator required. A reference keeper agent (`scripts/keeper.ts`) runs this loop autonomously: it monitors markets, resolves expired ones, and collects the bounty without any human pressing a button.
+The system is designed to run as an autonomous loop instead of a one-off manual script. Market resolution is permissionless and economically incentivized: each new market includes a resolver bounty, and any actor can trigger resolution once expiration is reached. A keeper agent (`scripts/keeper.ts`) continuously scans expired markets, submits resolve transactions, and captures the bounty while the contract handles final state transitions and payouts.
+
+Core behavior implemented in this repository:
+
+- Asynchronous agent invocation with verifiable on-chain callback handling
+- Permissionless market resolution with built-in resolver incentives
+- Deterministic payout logic for winners and explicit refund path for `UNKNOWN`
+- Operational tooling for repeatable deploy/test flows and request diagnostics
+- Browser UI plus script-based execution paths for reproducible demonstrations
 
 ## Start Here
 
