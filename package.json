@@ -10,6 +10,7 @@
     "create-market": "hardhat run scripts/createMarket.ts --network somniaTestnet",
     "place-bet": "hardhat run scripts/placeBet.ts --network somniaTestnet",
     "resolve-market": "hardhat run scripts/resolveMarket.ts --network somniaTestnet",
+    "keeper": "hardhat run scripts/keeper.ts --network somniaTestnet",
     "claim": "hardhat run scripts/claim.ts --network somniaTestnet",
     "diagnose": "hardhat run scripts/diagnose.ts --network somniaTestnet"
   },

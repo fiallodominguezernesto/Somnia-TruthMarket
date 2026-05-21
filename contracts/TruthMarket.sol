@@ -7,6 +7,7 @@ contract TruthMarket {
     uint256 constant LLM_AGENT_ID = 12847293847561029384;
     address constant PLATFORM = 0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776;
     uint256 constant MIN_BET = 0.01 ether;
+    uint256 constant MIN_CREATION_FEE = 0.02 ether;
 
     enum Outcome { Open, YES, NO, UNKNOWN }
 
@@ -17,6 +18,8 @@ contract TruthMarket {
         uint256 noPool;
         Outcome outcome;
         uint256 requestId;
+        uint256 bounty;     // resolver reward, funded by creation fee — separate from pools
+        address resolver;   // whoever triggered resolution
     }
 
     uint256 public marketCount;
@@ -25,18 +28,21 @@ contract TruthMarket {
     mapping(uint256 => mapping(address => uint256)) public noBets;
     mapping(uint256 => uint256) public requestToMarket;
 
-    event MarketCreated(uint256 indexed id, string question, uint256 deadline);
+    event MarketCreated(uint256 indexed id, string question, uint256 deadline, uint256 bounty);
     event BetPlaced(uint256 indexed id, address indexed bettor, bool isYes, uint256 amount);
     event MarketResolved(uint256 indexed id, Outcome outcome);
     event ResolutionText(uint256 indexed id, string text);
+    event BountyPaid(uint256 indexed id, address indexed resolver, uint256 amount);
     event Claimed(uint256 indexed id, address indexed bettor, uint256 amount);
 
     function createMarket(string calldata question, uint256 deadline) external payable returns (uint256 id) {
         require(deadline > block.timestamp, "Past deadline");
+        require(msg.value >= MIN_CREATION_FEE, "Creation fee");
         id = ++marketCount;
         markets[id].question = question;
         markets[id].deadline = deadline;
-        emit MarketCreated(id, question, deadline);
+        markets[id].bounty = msg.value;
+        emit MarketCreated(id, question, deadline, msg.value);
     }
 
     function placeBet(uint256 marketId, bool isYes) external payable {
@@ -90,6 +96,18 @@ contract TruthMarket {
         );
         m.requestId = reqId;
         requestToMarket[reqId] = marketId;
+
+        // Pay the resolver bounty: permissionless incentive for any agent to
+        // trigger resolution of expired markets. Funded by the creation fee,
+        // held separately from yes/no pools so claim accounting is unaffected.
+        uint256 reward = m.bounty;
+        m.bounty = 0;
+        m.resolver = msg.sender;
+        if (reward > 0) {
+            emit BountyPaid(marketId, msg.sender, reward);
+            (bool ok,) = msg.sender.call{value: reward}("");
+            require(ok, "Bounty transfer failed");
+        }
     }
 
     function handleResolution(

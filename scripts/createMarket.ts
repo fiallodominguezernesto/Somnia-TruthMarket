@@ -1,5 +1,5 @@
 import { network } from "hardhat";
-import { parseEventLogs } from "viem";
+import { parseEventLogs, parseEther } from "viem";
 import { readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
@@ -17,6 +17,9 @@ const QUICK_DEMO_QUESTION = "2 + 2 equals 4.";
 
 const DEADLINE_SECONDS = 20;
 
+// Must be >= MIN_CREATION_FEE in the contract. Funds the resolver bounty.
+const CREATION_FEE_STT = process.env.CREATION_FEE_STT ?? "0.02";
+
 async function main() {
   const { viem } = await network.create();
   const fullDemo = (process.env.FULL_DEMO ?? "false").toLowerCase() === "true";
@@ -30,9 +33,10 @@ async function main() {
   const deadline = BigInt(Math.floor(Date.now() / 1000) + DEADLINE_SECONDS);
 
   const marketIds: string[] = [];
+  const bounty = parseEther(CREATION_FEE_STT);
 
   for (const question of selectedQuestions) {
-    const hash = await contract.write.createMarket([question, deadline]);
+    const hash = await contract.write.createMarket([question, deadline], { value: bounty });
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
     const [event] = parseEventLogs({
@@ -42,7 +46,7 @@ async function main() {
     });
 
     const id = event.args.id!;
-    console.log(`✅ Market #${id}: "${question}"`);
+    console.log(`✅ Market #${id}: "${question}" (bounty ${CREATION_FEE_STT} STT)`);
     marketIds.push(id.toString());
   }
 

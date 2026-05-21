@@ -4,6 +4,8 @@ Autonomous micro prediction market MVP for Somnia Agentathon.
 
 Users create YES/NO factual markets, place STT bets, and resolve outcomes through Somnia Agents. After deadline, the contract sends an asynchronous LLM request and settles on-chain as `YES`, `NO`, or `UNKNOWN`.
 
+Resolution is **permissionless and incentivized**: each market is created with a bounty (funded by the creation fee) that is paid to whoever triggers `resolveMarket` after the deadline. Any agent can discover an expired market and resolve it for the reward — no privileged operator required. A reference keeper agent (`scripts/keeper.ts`) runs this loop autonomously: it monitors markets, resolves expired ones, and collects the bounty without any human pressing a button.
+
 ## Start Here
 
 - 3-minute path: `QUICKSTART.md`
@@ -31,6 +33,7 @@ Users create YES/NO factual markets, place STT bets, and resolve outcomes throug
 - `scripts/createMarket.ts` - create quick/full demo markets and write `scripts/markets.json`
 - `scripts/placeBet.ts` - place quick/full demo bets
 - `scripts/resolveMarket.ts` - resolve market via Somnia LLM and poll outcome events
+- `scripts/keeper.ts` - autonomous resolver agent: scans for expired markets and resolves them, earning the bounty
 - `scripts/claim.ts` - claim winnings or refunds
 - `scripts/diagnose.ts` - decode payload + inspect request telemetry for a resolve tx
 - `frontend/index.html` - minimal UI
@@ -76,6 +79,7 @@ npm run build
 - `npm run create-market` - create market(s)
 - `npm run place-bet` - place demo bets
 - `npm run resolve-market` - send async LLM request and wait for resolution event
+- `npm run keeper` - run the autonomous resolver agent (continuous loop)
 - `npm run claim` - claim payout/refund
 - `npm run diagnose` - inspect resolve tx and decode request internals
 
@@ -101,6 +105,7 @@ Behavior:
 - Quick mode default: creates 1 market with 20-second deadline
 - Full mode: `FULL_DEMO=true npm run create-market` creates 3 factual markets
 - IDs written to `scripts/markets.json`
+- Each market is created with a bounty (default `0.02 STT`, override with `CREATION_FEE_STT`). The contract requires at least `MIN_CREATION_FEE` (`0.02 STT`). This bounty is paid to whoever resolves the market.
 
 3) Place bets
 
@@ -129,6 +134,22 @@ Optional specific market:
 ```bash
 MARKET_ID=2 npm run resolve-market
 ```
+
+4b) Autonomous resolution via keeper (recommended for the demo)
+
+Instead of resolving by hand, run the keeper agent. It scans every market, finds expired ones still `Open`, resolves them autonomously, and collects the bounty:
+
+```bash
+npm run keeper
+```
+
+Behavior:
+- Scans on an interval (default `10s`, override with `KEEPER_SCAN_MS`)
+- Sends `getRequestDeposit() + top-up` per resolution (`RESOLVE_TOPUP_STT`, default `1.2`)
+- Skips markets already being resolved; rechecks if a callback is slow
+- Runs continuously until stopped (`Ctrl+C`)
+
+This is the loop to record for the demo video: create + bet, then start the keeper and show markets settling with no human intervention.
 
 5) Claim
 
