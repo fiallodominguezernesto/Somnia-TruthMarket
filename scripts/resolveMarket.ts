@@ -1,5 +1,5 @@
-import hre from "hardhat";
-import { parseAbiItem } from "viem";
+import { network } from "hardhat";
+import { parseAbiItem, type PublicClient } from "viem";
 import { readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
@@ -23,7 +23,7 @@ const POLL_MS = 5_000;        // polling interval
 const TIMEOUT_MS = 180_000;   // 3 minute timeout
 
 async function pollResolution(
-  publicClient: Awaited<ReturnType<typeof hre.viem.getPublicClient>>,
+  publicClient: PublicClient,
   contractAddress: `0x${string}`,
   marketId: bigint,
   startBlock: bigint
@@ -68,6 +68,7 @@ async function pollResolution(
 }
 
 async function main() {
+  const { viem } = await network.create();
   const { address, marketIds } = JSON.parse(
     readFileSync(join(__dirname, "markets.json"), "utf-8")
   );
@@ -75,8 +76,8 @@ async function main() {
   // Use MARKET_ID env var or the first market by default
   const marketId = BigInt(process.env.MARKET_ID ?? marketIds[0]);
 
-  const publicClient = await hre.viem.getPublicClient();
-  const contract = await hre.viem.getContractAt("TruthMarket", address);
+  const publicClient = await viem.getPublicClient();
+  const contract = await viem.getContractAt("TruthMarket", address);
 
   const market = await contract.read.markets([marketId]);
   const question = market[0];

@@ -1,12 +1,13 @@
 import "dotenv/config";
-import "@nomicfoundation/hardhat-viem";
-import type { HardhatUserConfig } from "hardhat/config";
+import hardhatViem from "@nomicfoundation/hardhat-viem";
+import { defineConfig } from "hardhat/config";
 
 const privateKey = process.env.PRIVATE_KEY ?? "";
 const normalizedPrivateKey =
   privateKey === "" ? "" : privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`;
 
-const config: HardhatUserConfig = {
+export default defineConfig({
+  plugins: [hardhatViem],
   solidity: {
     version: "0.8.20",
     settings: {
@@ -27,6 +28,4 @@ const config: HardhatUserConfig = {
       accounts: normalizedPrivateKey === "" ? [] : [normalizedPrivateKey],
     },
   },
-};
-
-export default config;
+});

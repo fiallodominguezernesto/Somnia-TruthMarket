@@ -1,4 +1,4 @@
-import hre from "hardhat";
+import { network } from "hardhat";
 import { formatEther, parseEther } from "viem";
 import { readFileSync } from "fs";
 import { dirname, join } from "path";
@@ -7,12 +7,13 @@ import { fileURLToPath } from "url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 async function main() {
+  const { viem } = await network.create();
   const { address, marketIds } = JSON.parse(
     readFileSync(join(__dirname, "markets.json"), "utf-8")
   );
 
-  const publicClient = await hre.viem.getPublicClient();
-  const contract = await hre.viem.getContractAt("TruthMarket", address);
+  const publicClient = await viem.getPublicClient();
+  const contract = await viem.getContractAt("TruthMarket", address);
 
   // Demo bets: correct majority + incorrect minority to show payout distribution
   const bets: Array<{ marketId: bigint; isYes: boolean; amount: bigint; label: string }> = [

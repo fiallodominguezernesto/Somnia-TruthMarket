@@ -1,4 +1,4 @@
-import hre from "hardhat";
+import { network } from "hardhat";
 import { formatEther, parseEventLogs } from "viem";
 import { readFileSync } from "fs";
 import { dirname, join } from "path";
@@ -9,15 +9,16 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUTCOMES = ["Open", "YES", "NO", "UNKNOWN"];
 
 async function main() {
+  const { viem } = await network.create();
   const { address, marketIds } = JSON.parse(
     readFileSync(join(__dirname, "markets.json"), "utf-8")
   );
 
   const marketId = BigInt(process.env.MARKET_ID ?? marketIds[0]);
 
-  const publicClient = await hre.viem.getPublicClient();
-  const contract = await hre.viem.getContractAt("TruthMarket", address);
-  const [wallet] = await hre.viem.getWalletClients();
+  const publicClient = await viem.getPublicClient();
+  const contract = await viem.getContractAt("TruthMarket", address);
+  const [wallet] = await viem.getWalletClients();
   const account = wallet.account.address;
 
   const market = await contract.read.markets([marketId]);

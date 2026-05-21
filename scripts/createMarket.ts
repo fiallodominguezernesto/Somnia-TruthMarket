@@ -1,4 +1,4 @@
-import hre from "hardhat";
+import { network } from "hardhat";
 import { parseEventLogs } from "viem";
 import { readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
@@ -16,12 +16,13 @@ const QUESTIONS = [
 const DEADLINE_MINUTES = 5;
 
 async function main() {
+  const { viem } = await network.create();
   const { TruthMarket: address } = JSON.parse(
     readFileSync(join(__dirname, "deployed.json"), "utf-8")
   );
 
-  const publicClient = await hre.viem.getPublicClient();
-  const contract = await hre.viem.getContractAt("TruthMarket", address);
+  const publicClient = await viem.getPublicClient();
+  const contract = await viem.getContractAt("TruthMarket", address);
   const deadline = BigInt(Math.floor(Date.now() / 1000) + DEADLINE_MINUTES * 60);
 
   const marketIds: string[] = [];
