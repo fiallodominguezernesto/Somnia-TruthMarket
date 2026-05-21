@@ -1,5 +1,5 @@
 import { network } from "hardhat";
-import { parseAbiItem, type PublicClient } from "viem";
+import { parseAbiItem, parseEther, type PublicClient } from "viem";
 import { readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
@@ -30,6 +30,7 @@ async function pollResolution(
 ): Promise<string | null> {
   const deadline = Date.now() + TIMEOUT_MS;
   const event = parseAbiItem("event MarketResolved(uint256 indexed id, uint8 outcome)");
+  const textEvent = parseAbiItem("event ResolutionText(uint256 indexed id, string text)");
 
   let searchFrom = startBlock;
 
@@ -52,6 +53,16 @@ async function pollResolution(
 
       if (logs.length > 0) {
         const outcome = OUTCOMES[Number(logs[0].args.outcome)] ?? "Unknown";
+        const textLogs = await publicClient.getLogs({
+          address: contractAddress,
+          event: textEvent,
+          args: { id: marketId },
+          fromBlock: from,
+          toBlock: to,
+        });
+        if (textLogs.length > 0) {
+          console.log(`LLM text: ${textLogs[textLogs.length - 1].args.text}`);
+        }
         console.log(`\n✅ Market #${marketId} resolved → ${outcome}`);
         return outcome;
       }
@@ -59,7 +70,7 @@ async function pollResolution(
 
     searchFrom = latest + 1n;
     const elapsed = Math.round((TIMEOUT_MS - (deadline - Date.now())) / 1000);
-    process.stdout.write(`\r  ${elapsed}s — bloque actual: ${latest}   `);
+    process.stdout.write(`\r  ${elapsed}s - current block: ${latest}   `);
     await new Promise((r) => setTimeout(r, POLL_MS));
   }
 
@@ -99,13 +110,19 @@ async function main() {
     abi: PLATFORM_ABI,
     functionName: "getRequestDeposit",
   });
-  console.log(`\nRequired deposit: ${deposit} wei`);
+  const topupStt = process.env.RESOLVE_TOPUP_STT ?? "0.15";
+  const topup = parseEther(topupStt);
+  const totalValue = deposit + topup;
 
-  const hash = await contract.write.resolveMarket([marketId], { value: deposit });
+  console.log(`\nRequired deposit: ${deposit} wei`);
+  console.log(`Top-up value: ${topup} wei (${topupStt} STT)`);
+  console.log(`Total value sent: ${totalValue} wei`);
+
+  const hash = await contract.write.resolveMarket([marketId], { value: totalValue });
   console.log(`resolveMarket tx: ${hash}`);
 
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  console.log(`Confirmado en bloque ${receipt.blockNumber}. Esperando callback del LLM...`);
+  console.log(`Confirmed in block ${receipt.blockNumber}. Waiting for LLM callback...`);
 
   await pollResolution(publicClient, address, marketId, receipt.blockNumber);
 }
