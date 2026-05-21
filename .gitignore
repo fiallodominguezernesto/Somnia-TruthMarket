@@ -1,0 +1,16 @@
+node_modules/
+artifacts/
+cache/
+coverage/
+dist/
+broadcast/
+out/
+.env
+.DS_Store
+.claude/
+.opencode/
+opencode.json
+opencode.jsonc
+TODO.txt
+checklist.txt
+dir ssh repo github.txt

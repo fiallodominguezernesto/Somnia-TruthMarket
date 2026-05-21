@@ -1,0 +1,28 @@
+{
+  "name": "somnia",
+  "version": "1.0.0",
+  "description": "Somnia Agentathon MVP workspace",
+  "main": "index.js",
+  "scripts": {
+    "build": "hardhat compile",
+    "clean": "hardhat clean",
+    "deploy": "hardhat run scripts/deploy.ts --network somniaTestnet",
+    "create-market": "hardhat run scripts/createMarket.ts --network somniaTestnet",
+    "place-bet": "hardhat run scripts/placeBet.ts --network somniaTestnet",
+    "resolve-market": "hardhat run scripts/resolveMarket.ts --network somniaTestnet",
+    "claim": "hardhat run scripts/claim.ts --network somniaTestnet"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-viem": "^3.0.8",
+    "@types/node": "^25.9.1",
+    "dotenv": "^17.4.2",
+    "hardhat": "^3.5.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3",
+    "viem": "^2.50.4"
+  }
+}
