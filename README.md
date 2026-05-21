@@ -147,6 +147,22 @@ Then:
 2) Set deployed contract address
 3) Create market, bet, resolve, and claim from UI
 
+UI resolve also sends `getRequestDeposit() + 1.2 STT` by default.
+
+## Diagnose Requests
+
+Inspect a resolve transaction and decode the real payload/request telemetry:
+
+```bash
+RESOLVE_TX=0x... npm run diagnose
+```
+
+Useful overrides:
+
+```bash
+MARKET_ID=2 RESOLVE_TX=0x... npm run diagnose
+```
+
 ## Notes for Demo Video
 
 - Use clear factual statements with deterministic answers:

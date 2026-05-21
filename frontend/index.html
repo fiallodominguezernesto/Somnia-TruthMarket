@@ -141,7 +141,7 @@
         <h2>2) Create Market</h2>
         <div class="row">
           <label>Question</label>
-          <textarea id="question" placeholder="Is this statement true? ..."></textarea>
+          <textarea id="question" placeholder="Is this statement true? ...">2 + 2 equals 4.</textarea>
           <div class="row two">
             <div>
               <label>Deadline Seconds From Now</label>
@@ -183,6 +183,7 @@
           <label>Market ID</label>
           <input id="actionMarketId" type="number" min="1" value="1" />
           <button id="resolveBtn" class="secondary">Resolve Market (LLM)</button>
+          <div class="status">Resolve sends platform deposit + 1.2 STT top-up by default.</div>
           <button id="claimBtn" class="danger">Claim Winnings</button>
         </div>
       </article>

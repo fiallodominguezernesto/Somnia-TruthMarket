@@ -31,34 +31,6 @@ contract TruthMarket {
     event ResolutionText(uint256 indexed id, string text);
     event Claimed(uint256 indexed id, address indexed bettor, uint256 amount);
 
-    function _lower(bytes1 c) internal pure returns (bytes1) {
-        if (c >= 0x41 && c <= 0x5A) return bytes1(uint8(c) + 32);
-        return c;
-    }
-
-    function _contains(bytes memory text, bytes memory needle) internal pure returns (bool) {
-        if (needle.length == 0 || text.length < needle.length) return false;
-        for (uint256 i = 0; i <= text.length - needle.length; i++) {
-            bool match_ = true;
-            for (uint256 j = 0; j < needle.length; j++) {
-                if (_lower(text[i + j]) != _lower(needle[j])) {
-                    match_ = false;
-                    break;
-                }
-            }
-            if (match_) return true;
-        }
-        return false;
-    }
-
-    function _startsWith(bytes memory text, bytes memory prefix) internal pure returns (bool) {
-        if (text.length < prefix.length) return false;
-        for (uint256 i = 0; i < prefix.length; i++) {
-            if (_lower(text[i]) != _lower(prefix[i])) return false;
-        }
-        return true;
-    }
-
     function createMarket(string calldata question, uint256 deadline) external payable returns (uint256 id) {
         require(deadline > block.timestamp, "Past deadline");
         id = ++marketCount;
@@ -141,20 +113,7 @@ contract TruthMarket {
             } else if (keccak256(bytes(result)) == keccak256("NO")) {
                 outcome = Outcome.NO;
             } else {
-                bytes memory r = bytes(result);
-                bool hasUnknown = _contains(r, bytes("unknown"));
-                bool hasYes = _startsWith(r, bytes("yes")) || _contains(r, bytes(" yes"));
-                bool hasNo = _startsWith(r, bytes("no")) || _contains(r, bytes(" no"));
-                if (hasUnknown) {
-                    outcome = Outcome.UNKNOWN;
-                } else
-                if (hasYes && !hasNo) {
-                    outcome = Outcome.YES;
-                } else if (hasNo && !hasYes) {
-                    outcome = Outcome.NO;
-                } else {
-                    outcome = Outcome.UNKNOWN;
-                }
+                outcome = Outcome.UNKNOWN;
             }
         } else {
             outcome = Outcome.UNKNOWN;

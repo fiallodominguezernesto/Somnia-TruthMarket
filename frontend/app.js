@@ -105,6 +105,10 @@ const platformAbi = [
 
 const OUTCOMES = ["Open", "YES", "NO", "UNKNOWN"];
 
+// Budget on top of getRequestDeposit() so the LLM subcommittee can run inference.
+// Too little here makes the agent fail and the market resolves UNKNOWN.
+const RESOLVE_TOPUP = parseEther("1.2");
+
 const publicClient = createPublicClient({
   chain: somniaTestnet,
   transport: http(SOMNIA_RPC),
@@ -238,8 +242,9 @@ $("resolveBtn").addEventListener("click", async () => {
       abi: platformAbi,
       functionName: "getRequestDeposit",
     });
-    log(`Platform deposit: ${formatEther(deposit)} STT`);
-    const hash = await contract.write.resolveMarket([marketId], { account, value: deposit });
+    const value = deposit + RESOLVE_TOPUP;
+    log(`Deposit ${formatEther(deposit)} + top-up ${formatEther(RESOLVE_TOPUP)} = ${formatEther(value)} STT`);
+    const hash = await contract.write.resolveMarket([marketId], { account, value });
     await waitTx(hash);
     log(`Resolution requested for market #${marketId}. Wait for async callback.`);
   } catch (error) {
