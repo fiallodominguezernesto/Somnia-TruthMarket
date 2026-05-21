@@ -6,6 +6,7 @@ Users create YES/NO factual markets, place STT bets, and resolve outcomes throug
 
 ## Start Here
 
+- 3-minute path: `QUICKSTART.md`
 - Full step-by-step guide in English and Spanish: `HOW_TO_USE.md`
 - Recommended first test path: Scripts flow (`deploy -> create -> bet -> resolve -> claim`)
 
