@@ -14,3 +14,5 @@ opencode.jsonc
 TODO.txt
 checklist.txt
 dir ssh repo github.txt
+scripts/deployed.json
+scripts/markets.json
