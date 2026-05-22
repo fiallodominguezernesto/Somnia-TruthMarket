@@ -2,12 +2,50 @@
 
 Use this if you want the fastest end-to-end verification.
 
-## 0) Prerequisites
+## 0) Setup from zero (clone + tools + env)
 
-- Run in WSL Ubuntu
-- `.env` exists with `PRIVATE_KEY`
-- `.env` includes `LLM_AGENT_ID` (real LLM Inference agent ID)
-- Wallet funded with testnet STT
+1. Clone and enter repo:
+
+```bash
+git clone git@github.com:fiallodominguezernesto/Somnia-TruthMarket.git
+cd Somnia-TruthMarket
+```
+
+2. Prepare tooling in WSL Ubuntu:
+
+```bash
+sudo apt update
+sudo apt install -y git curl build-essential python3
+export NVM_DIR="$HOME/.nvm"
+if [ ! -s "$NVM_DIR/nvm.sh" ]; then curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash; fi
+source ~/.nvm/nvm.sh
+nvm install --lts
+nvm use --lts
+node --version
+npm --version
+```
+
+3. Install dependencies:
+
+```bash
+npm install
+```
+
+4. Create environment file:
+
+```bash
+cp .env.example .env
+```
+
+5. Set minimum values in `.env`:
+
+- `PRIVATE_KEY=0x...`
+- `SOMNIA_RPC_URL=https://api.infra.testnet.somnia.network`
+- `LLM_AGENT_ID=<real LLM Inference agent ID>`
+
+6. Fund wallet with testnet STT:
+
+- `https://testnet.somnia.network/faucet`
 
 Optional pre-check (no deployment):
 

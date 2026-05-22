@@ -8,6 +8,62 @@ Esta guia explica como ejecutar el proyecto end-to-end usando scripts y UI.
 
 ## English Guide
 
+### 0) Clone repo and prepare environment
+
+1. Clone and enter project:
+
+```bash
+git clone git@github.com:fiallodominguezernesto/Somnia-TruthMarket.git
+cd Somnia-TruthMarket
+```
+
+2. Prepare base tools in WSL Ubuntu:
+
+```bash
+sudo apt update
+sudo apt install -y git curl build-essential python3
+export NVM_DIR="$HOME/.nvm"
+if [ ! -s "$NVM_DIR/nvm.sh" ]; then curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash; fi
+source ~/.nvm/nvm.sh
+nvm install --lts
+nvm use --lts
+node --version
+npm --version
+```
+
+3. Install project dependencies:
+
+```bash
+npm install
+```
+
+4. Create `.env` from template:
+
+```bash
+cp .env.example .env
+```
+
+5. Set required variables in `.env`:
+
+- `PRIVATE_KEY=0x...`
+- `SOMNIA_RPC_URL=https://api.infra.testnet.somnia.network`
+- `LLM_AGENT_ID=<real LLM Inference ID>`
+
+6. Optional but recommended: install Foundry tools:
+
+```bash
+curl -L https://foundry.paradigm.xyz | bash
+~/.foundry/bin/foundryup
+~/.foundry/bin/forge --version
+```
+
+7. Validate environment before deploy:
+
+```bash
+npm run sim-platform
+npm run build
+```
+
 ### 1) Prerequisites
 
 - Use WSL Ubuntu terminal.
@@ -179,6 +235,62 @@ Claim failed?
 ---
 
 ## Guia en Espanol
+
+### 0) Clonar repo y preparar entorno
+
+1. Clona y entra al proyecto:
+
+```bash
+git clone git@github.com:fiallodominguezernesto/Somnia-TruthMarket.git
+cd Somnia-TruthMarket
+```
+
+2. Prepara herramientas base en WSL Ubuntu:
+
+```bash
+sudo apt update
+sudo apt install -y git curl build-essential python3
+export NVM_DIR="$HOME/.nvm"
+if [ ! -s "$NVM_DIR/nvm.sh" ]; then curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash; fi
+source ~/.nvm/nvm.sh
+nvm install --lts
+nvm use --lts
+node --version
+npm --version
+```
+
+3. Instala dependencias del proyecto:
+
+```bash
+npm install
+```
+
+4. Crea `.env` desde la plantilla:
+
+```bash
+cp .env.example .env
+```
+
+5. Configura variables requeridas en `.env`:
+
+- `PRIVATE_KEY=0x...`
+- `SOMNIA_RPC_URL=https://api.infra.testnet.somnia.network`
+- `LLM_AGENT_ID=<ID real de LLM Inference>`
+
+6. Opcional pero recomendado: instalar herramientas Foundry:
+
+```bash
+curl -L https://foundry.paradigm.xyz | bash
+~/.foundry/bin/foundryup
+~/.foundry/bin/forge --version
+```
+
+7. Valida el entorno antes del deploy:
+
+```bash
+npm run sim-platform
+npm run build
+```
 
 ### 1) Prerrequisitos
 

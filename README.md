@@ -32,6 +32,64 @@ User/Script/UI
 - Full step-by-step guide in English and Spanish: `HOW_TO_USE.md`
 - Recommended first test path: Scripts flow (`deploy -> create -> bet -> resolve -> claim`)
 
+## Setup from Scratch
+
+If this is your first time running the project, follow these steps before the flow guides.
+
+1) Clone repository
+
+```bash
+git clone git@github.com:fiallodominguezernesto/Somnia-TruthMarket.git
+cd Somnia-TruthMarket
+```
+
+2) Prepare tooling in WSL Ubuntu
+
+```bash
+sudo apt update
+sudo apt install -y git curl build-essential python3
+export NVM_DIR="$HOME/.nvm"
+if [ ! -s "$NVM_DIR/nvm.sh" ]; then curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash; fi
+source ~/.nvm/nvm.sh
+nvm install --lts
+nvm use --lts
+node --version
+npm --version
+```
+
+Optional Foundry tools (recommended):
+
+```bash
+curl -L https://foundry.paradigm.xyz | bash
+~/.foundry/bin/foundryup
+~/.foundry/bin/forge --version
+```
+
+3) Install project dependencies
+
+```bash
+npm install
+```
+
+4) Create runtime environment
+
+```bash
+cp .env.example .env
+```
+
+Set at least:
+
+- `PRIVATE_KEY=0x...`
+- `SOMNIA_RPC_URL=https://api.infra.testnet.somnia.network`
+- `LLM_AGENT_ID=...` (real LLM Inference agent ID)
+
+5) Validate setup and build
+
+```bash
+npm run sim-platform
+npm run build
+```
+
 ## Network and Agent Context
 
 - Network: Somnia Testnet (Chain ID `50312`)
