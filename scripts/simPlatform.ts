@@ -5,7 +5,7 @@ import {
   toFunctionSelector,
   encodeAbiParameters,
 } from "viem";
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
@@ -53,17 +53,31 @@ const inferStringSelector = toFunctionSelector(
 
 async function main() {
   const { viem } = await network.create();
-  const { TruthMarket: address } = JSON.parse(
-    readFileSync(join(__dirname, "deployed.json"), "utf-8")
-  );
   const publicClient = await viem.getPublicClient();
   const [wallet] = await viem.getWalletClients();
-  const contract = await viem.getContractAt("TruthMarket", address);
 
-  const handleResolutionItem = (contract.abi as any[]).find(
-    (i) => i.type === "function" && i.name === "handleResolution"
-  );
-  const callbackSelector = toFunctionSelector(handleResolutionItem);
+  const deployedPath = join(__dirname, "deployed.json");
+  const deployedExists = existsSync(deployedPath);
+  const deployed = deployedExists
+    ? JSON.parse(readFileSync(deployedPath, "utf-8"))
+    : null;
+
+  // Use deployed TruthMarket callback when available. If this is a pre-deploy
+  // check, fallback to a safe callback target so we can still validate
+  // platform + agent ID wiring without requiring deployed.json.
+  let callbackAddress =
+    (process.env.CALLBACK_ADDRESS as `0x${string}` | undefined) ??
+    (deployed?.TruthMarket as `0x${string}` | undefined) ??
+    PLATFORM;
+  let callbackSelector: `0x${string}` = "0x12345678";
+
+  if (deployed?.TruthMarket) {
+    const contract = await viem.getContractAt("TruthMarket", deployed.TruthMarket as `0x${string}`);
+    const handleResolutionItem = (contract.abi as any[]).find(
+      (i) => i.type === "function" && i.name === "handleResolution"
+    );
+    callbackSelector = toFunctionSelector(handleResolutionItem);
+  }
 
   const payload = (inferStringSelector +
     encodeAbiParameters(
@@ -90,12 +104,18 @@ async function main() {
 
   console.log(`callbackSelector: ${callbackSelector}`);
   console.log(`Simulating platform.createRequest from EOA ${wallet.account.address}`);
-  console.log(`callbackAddress: ${address}, value: ${value} wei\n`);
+  if (!deployedExists) {
+    console.log("Note: scripts/deployed.json not found. Running pre-deploy simulation mode.");
+    console.log(`Using callback fallback: ${callbackAddress} with selector ${callbackSelector}`);
+    console.log("Tip: set CALLBACK_ADDRESS=0x... to override callback fallback.");
+  }
+
+  console.log(`callbackAddress: ${callbackAddress}, value: ${value} wei\n`);
 
   const data = encodeFunctionData({
     abi: platformAbi,
     functionName: "createRequest",
-    args: [LLM_AGENT_ID, address, callbackSelector, payload],
+    args: [LLM_AGENT_ID, callbackAddress, callbackSelector, payload],
   });
 
   try {

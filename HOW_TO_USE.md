@@ -81,6 +81,8 @@ Optional validation before deploy:
 npm run sim-platform
 ```
 
+`sim-platform` works before deploy and does not require `scripts/deployed.json`.
+
 Commands:
 
 ```bash
@@ -308,6 +310,8 @@ Validacion opcional antes de deploy:
 ```bash
 npm run sim-platform
 ```
+
+`sim-platform` funciona antes del deploy y no requiere `scripts/deployed.json`.
 
 Comandos:
 

@@ -163,6 +163,8 @@ Verify an agent ID is valid before deploying (no funds spent):
 LLM_AGENT_ID=<id> npm run sim-platform
 ```
 
+Note: `sim-platform` can run before `npm run deploy`; it no longer requires `scripts/deployed.json`.
+
 Fund the wallet from faucet:
 
 - `https://testnet.somnia.network/faucet`

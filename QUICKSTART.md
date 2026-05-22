@@ -53,6 +53,8 @@ Optional pre-check (no deployment):
 npm run sim-platform
 ```
 
+`sim-platform` works before deploy and does not require `scripts/deployed.json`.
+
 ## 1) Path A (Recommended): Autonomous Keeper Flow
 
 ```bash
