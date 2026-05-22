@@ -6,6 +6,9 @@ import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Places demo bets for quick mode or full mode using scripts/markets.json.
+ */
 async function main() {
   const { viem } = await network.create();
   const { address, marketIds } = JSON.parse(

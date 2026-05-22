@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Verifiable historical facts with clear LLM answers
+/** Verifiable historical facts with clear LLM answers. */
 const QUESTIONS = [
   "Bitcoin's genesis block was mined on January 3, 2009.",          // → YES
   "Ethereum's Merge (switch to Proof of Stake) occurred in September 2022.", // → YES
@@ -15,11 +15,15 @@ const QUESTIONS = [
 
 const QUICK_DEMO_QUESTION = "2 + 2 equals 4.";
 
+/** Market lifetime used by this script in seconds. */
 const DEADLINE_SECONDS = 60;
 
 // Must be >= MIN_CREATION_FEE in the contract. Funds the resolver bounty.
 const CREATION_FEE_STT = process.env.CREATION_FEE_STT ?? "0.02";
 
+/**
+ * Creates one or more markets and stores generated IDs in scripts/markets.json.
+ */
 async function main() {
   const { viem } = await network.create();
   const fullDemo = (process.env.FULL_DEMO ?? "false").toLowerCase() === "true";

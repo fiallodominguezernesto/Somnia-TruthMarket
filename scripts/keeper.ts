@@ -17,6 +17,7 @@ const PLATFORM_ABI = [
   },
 ] as const;
 
+/** Human-readable market outcomes by enum index. */
 const OUTCOMES = ["Open", "YES", "NO", "UNKNOWN"];
 
 // How often the keeper scans for expired markets.
@@ -28,6 +29,9 @@ const TOPUP_STT = process.env.RESOLVE_TOPUP_STT ?? "1.2";
 // [question, deadline, yesPool, noPool, outcome, requestId, bounty, resolver]
 type MarketTuple = readonly [string, bigint, bigint, bigint, number, bigint, bigint, string];
 
+/**
+ * Runs an autonomous keeper loop that resolves expired, still-open markets.
+ */
 async function main() {
   const { viem } = await network.create();
   const { TruthMarket: address } = JSON.parse(
@@ -45,6 +49,9 @@ async function main() {
 
   const inFlight = new Set<string>();
 
+  /**
+   * Finds candidate markets and dispatches one resolve task per market.
+   */
   async function scan() {
     const nowSec = BigInt(Math.floor(Date.now() / 1000));
     const count = (await contract.read.marketCount()) as bigint;
@@ -70,6 +77,9 @@ async function main() {
     }
   }
 
+  /**
+   * Submits resolveMarket and then waits for asynchronous settlement.
+   */
   async function resolve(id: bigint, bounty: bigint) {
     try {
       const deposit = (await publicClient.readContract({
@@ -91,6 +101,9 @@ async function main() {
     }
   }
 
+  /**
+   * Polls market state until outcome changes from Open or timeout is hit.
+   */
   async function waitForResolution(id: bigint) {
     const deadline = Date.now() + 180_000;
     while (Date.now() < deadline) {

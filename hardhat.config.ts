@@ -2,6 +2,9 @@ import "dotenv/config";
 import hardhatViem from "@nomicfoundation/hardhat-viem";
 import { defineConfig } from "hardhat/config";
 
+/**
+ * Normalizes PRIVATE_KEY so both `abcd...` and `0xabcd...` formats work.
+ */
 const privateKey = process.env.PRIVATE_KEY ?? "";
 const normalizedPrivateKey =
   privateKey === "" ? "" : privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`;

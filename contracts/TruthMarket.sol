@@ -3,22 +3,33 @@ pragma solidity ^0.8.20;
 
 import "./interfaces/IAgentRequester.sol";
 
+/// @title TruthMarket
+/// @notice On-chain YES/NO prediction market settled through Somnia's agent platform.
+/// @dev Markets are resolved asynchronously by calling the platform and handling
+/// the callback in `handleResolution`.
 contract TruthMarket {
     // Real LLM Inference agent ID from the Somnia Agent Explorer
     // (https://agents.testnet.somnia.network). Set at deploy time — using an
     // unregistered ID makes platform.createRequest revert with no reason.
+    /// @notice LLM Inference agent ID registered in Somnia platform.
     uint256 public immutable llmAgentId;
+    /// @notice Somnia platform contract used to create async requests.
     address constant PLATFORM = 0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776;
+    /// @notice Minimum stake accepted by `placeBet`.
     uint256 constant MIN_BET = 0.01 ether;
+    /// @notice Minimum fee accepted by `createMarket` and assigned as bounty.
     uint256 constant MIN_CREATION_FEE = 0.02 ether;
 
+    /// @param _llmAgentId LLM Inference agent ID from Somnia Agent Explorer.
     constructor(uint256 _llmAgentId) {
         require(_llmAgentId != 0, "Agent ID required");
         llmAgentId = _llmAgentId;
     }
 
+    /// @notice Market lifecycle and settlement outcome.
     enum Outcome { Open, YES, NO, UNKNOWN }
 
+    /// @notice Market state tracked on-chain.
     struct Market {
         string question;
         uint256 deadline;
@@ -43,6 +54,10 @@ contract TruthMarket {
     event BountyPaid(uint256 indexed id, address indexed resolver, uint256 amount);
     event Claimed(uint256 indexed id, address indexed bettor, uint256 amount);
 
+    /// @notice Creates a new market and escrow the resolver bounty.
+    /// @param question Factual statement to resolve as YES/NO/UNKNOWN.
+    /// @param deadline Unix timestamp when betting closes and resolution can begin.
+    /// @return id Newly created market ID.
     function createMarket(string calldata question, uint256 deadline) external payable returns (uint256 id) {
         require(deadline > block.timestamp, "Past deadline");
         require(msg.value >= MIN_CREATION_FEE, "Creation fee");
@@ -53,6 +68,9 @@ contract TruthMarket {
         emit MarketCreated(id, question, deadline, msg.value);
     }
 
+    /// @notice Places a YES or NO bet on an open market.
+    /// @param marketId Target market ID.
+    /// @param isYes True for YES side, false for NO side.
     function placeBet(uint256 marketId, bool isYes) external payable {
         require(msg.value >= MIN_BET, "Min 0.01 STT");
         Market storage m = markets[marketId];
@@ -69,6 +87,10 @@ contract TruthMarket {
         emit BetPlaced(marketId, msg.sender, isYes, msg.value);
     }
 
+    /// @notice Starts asynchronous resolution through Somnia platform.
+    /// @dev Caller sends `getRequestDeposit()` plus optional top-up and receives
+    /// the market bounty immediately as resolver incentive.
+    /// @param marketId Target market ID.
     function resolveMarket(uint256 marketId) external payable {
         Market storage m = markets[marketId];
         require(m.deadline > 0, "No market");
@@ -118,6 +140,11 @@ contract TruthMarket {
         }
     }
 
+    /// @notice Callback invoked by Somnia platform with LLM responses.
+    /// @dev Only `PLATFORM` can call this function.
+    /// @param requestId Platform request ID created in `resolveMarket`.
+    /// @param responses Validator responses returned by the platform.
+    /// @param status Global request status.
     function handleResolution(
         uint256 requestId,
         Response[] memory responses,
@@ -149,6 +176,10 @@ contract TruthMarket {
         emit MarketResolved(marketId, outcome);
     }
 
+    /// @notice Claims payout for the caller after market settlement.
+    /// @dev For `UNKNOWN`, user gets refund of both sides. For YES/NO, payout is
+    /// proportional to the winning pool.
+    /// @param marketId Target market ID.
     function claim(uint256 marketId) external {
         Market storage m = markets[marketId];
         require(m.outcome != Outcome.Open, "Not resolved");
@@ -178,5 +209,6 @@ contract TruthMarket {
         require(ok, "Transfer failed");
     }
 
+    /// @notice Allows the contract to receive native STT.
     receive() external payable {}
 }

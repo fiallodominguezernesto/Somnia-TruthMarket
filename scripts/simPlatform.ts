@@ -51,6 +51,10 @@ const inferStringSelector = toFunctionSelector(
 // handleResolution(uint256,(address,bytes,uint8,uint256,uint256,uint256)[],uint8,(...)) — only the selector matters here.
 // We reuse the deployed contract ABI to get the exact selector.
 
+/**
+ * Simulates `platform.createRequest` to validate agent ID and payload wiring.
+ * Works both pre-deploy and post-deploy.
+ */
 async function main() {
   const { viem } = await network.create();
   const publicClient = await viem.getPublicClient();

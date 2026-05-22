@@ -17,11 +17,15 @@ const PLATFORM_ABI = [
   },
 ] as const;
 
+/** Human-readable market outcomes by enum index. */
 const OUTCOMES = ["Open", "YES", "NO", "UNKNOWN"];
 const BLOCK_WINDOW = 1000n;   // Somnia: max 1000 blocks per getLogs query
 const POLL_MS = 5_000;        // polling interval
 const TIMEOUT_MS = 180_000;   // 3 minute timeout
 
+/**
+ * Polls MarketResolved and ResolutionText events until settlement or timeout.
+ */
 async function pollResolution(
   publicClient: PublicClient,
   contractAddress: `0x${string}`,
@@ -78,6 +82,9 @@ async function pollResolution(
   return null;
 }
 
+/**
+ * Resolves a selected market by sending the required platform deposit + top-up.
+ */
 async function main() {
   const { viem } = await network.create();
   const { address, marketIds } = JSON.parse(

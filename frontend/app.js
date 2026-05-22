@@ -148,11 +148,17 @@ const els = {
 
 els.address.value = contractAddress;
 
+/**
+ * Prepends a timestamped line to the UI log panel.
+ */
 function log(message) {
   const line = `[${new Date().toLocaleTimeString()}] ${message}`;
   els.log.textContent = `${line}\n${els.log.textContent}`.trim();
 }
 
+/**
+ * Validates and returns the configured TruthMarket contract address.
+ */
 function requireAddress() {
   const value = els.address.value.trim();
   if (!/^0x[a-fA-F0-9]{40}$/.test(value)) {
@@ -162,12 +168,18 @@ function requireAddress() {
   return value;
 }
 
+/**
+ * Ensures an injected wallet is connected before write actions.
+ */
 function requireWallet() {
   if (!walletClient || !account) {
     throw new Error("Connect wallet first.");
   }
 }
 
+/**
+ * Returns a viem contract client bound to current address and wallet.
+ */
 function getContractClient() {
   const address = requireAddress();
   return getContract({
@@ -177,6 +189,9 @@ function getContractClient() {
   });
 }
 
+/**
+ * Waits for transaction finality and logs the mined block number.
+ */
 async function waitTx(hash) {
   log(`Waiting tx: ${hash}`);
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
@@ -281,6 +296,9 @@ $("claimBtn").addEventListener("click", async () => {
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
+/**
+ * Derives a user-friendly market status string from market fields.
+ */
 function resolutionStatus(outcome, requestId, deadline, resolver) {
   const now = BigInt(Math.floor(Date.now() / 1000));
   if (Number(outcome) !== 0) {
@@ -292,6 +310,9 @@ function resolutionStatus(outcome, requestId, deadline, resolver) {
   return "Open — accepting bets";
 }
 
+/**
+ * Loads market state plus current account bets and renders a JSON snapshot.
+ */
 async function loadMarket(marketId) {
   const contract = getContractClient();
   const market = await contract.read.markets([marketId]);
@@ -340,6 +361,9 @@ $("inspectBtn").addEventListener("click", async () => {
 let autoRefreshTimer = null;
 let lastSeenOutcome = null;
 
+/**
+ * Stops auto-refresh polling and resets watcher labels.
+ */
 function stopAutoRefresh() {
   if (autoRefreshTimer) clearInterval(autoRefreshTimer);
   autoRefreshTimer = null;
@@ -348,6 +372,9 @@ function stopAutoRefresh() {
   els.refreshState.textContent = "Turn on auto-refresh to watch the keeper resolve this market live.";
 }
 
+/**
+ * Starts periodic market refresh and auto-stops once outcome is settled.
+ */
 function startAutoRefresh() {
   let marketId;
   try {

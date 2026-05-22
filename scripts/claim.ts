@@ -6,8 +6,12 @@ import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+/** Human-readable market outcomes by enum index. */
 const OUTCOMES = ["Open", "YES", "NO", "UNKNOWN"];
 
+/**
+ * Reads user position and submits claim for winnings or UNKNOWN refund.
+ */
 async function main() {
   const { viem } = await network.create();
   const { address, marketIds } = JSON.parse(

@@ -5,6 +5,9 @@ import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Deploys TruthMarket and persists deployment metadata for other scripts.
+ */
 async function main() {
   const { viem } = await network.create();
   const [deployer] = await viem.getWalletClients();
