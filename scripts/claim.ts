@@ -1,22 +1,20 @@
 import { network } from "hardhat";
 import { formatEther, parseEventLogs } from "viem";
-import { readFileSync } from "fs";
-import { dirname, join } from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-/** Human-readable market outcomes by enum index. */
-const OUTCOMES = ["Open", "YES", "NO", "UNKNOWN"];
+import {
+  OUTCOMES,
+  loadDeployed,
+  loadMarkets,
+  withRetry,
+  type MarketTuple,
+} from "./_lib.js";
 
 /**
  * Reads user position and submits claim for winnings or UNKNOWN refund.
  */
 async function main() {
   const { viem } = await network.create();
-  const { address, marketIds } = JSON.parse(
-    readFileSync(join(__dirname, "markets.json"), "utf-8")
-  );
+  const { TruthMarket: deployedAddress } = loadDeployed();
+  const { address, marketIds } = loadMarkets(deployedAddress);
 
   const marketId = BigInt(process.env.MARKET_ID ?? marketIds[0]);
 
@@ -25,9 +23,12 @@ async function main() {
   const [wallet] = await viem.getWalletClients();
   const account = wallet.account.address;
 
-  const market = await contract.read.markets([marketId]);
+  const market = await withRetry(
+    () => contract.read.markets([marketId]) as Promise<MarketTuple>,
+    { label: `markets(${marketId})` }
+  );
   const question = market[0];
-  const outcomeIdx = market[4] as number;
+  const outcomeIdx = market[4];
   const outcome = OUTCOMES[outcomeIdx] ?? "Unknown";
 
   console.log(`Market #${marketId}: "${question}"`);
@@ -39,8 +40,14 @@ async function main() {
   }
 
   const [yesBet, noBet] = await Promise.all([
-    contract.read.yesBets([marketId, account]),
-    contract.read.noBets([marketId, account]),
+    withRetry(
+      () => contract.read.yesBets([marketId, account]) as Promise<bigint>,
+      { label: "yesBets" }
+    ),
+    withRetry(
+      () => contract.read.noBets([marketId, account]) as Promise<bigint>,
+      { label: "noBets" }
+    ),
   ]);
 
   console.log("\nYour bets:");
@@ -52,7 +59,8 @@ async function main() {
     return;
   }
 
-  const [yesPool, noPool] = [market[2] as bigint, market[3] as bigint];
+  const yesPool = market[2];
+  const noPool = market[3];
   const totalPool = yesPool + noPool;
 
   // Calculate estimated payout before sending tx
@@ -72,8 +80,14 @@ async function main() {
 
   console.log(`\nEstimated payout: ${formatEther(estimatedPayout)} STT`);
 
-  const hash = await contract.write.claim([marketId]);
-  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  const hash = await withRetry(
+    () => contract.write.claim([marketId]),
+    { label: `claim(${marketId})` }
+  );
+  const receipt = await withRetry(
+    () => publicClient.waitForTransactionReceipt({ hash }),
+    { label: `waitForTransactionReceipt(${hash})` }
+  );
 
   const events = parseEventLogs({
     abi: contract.abi,
@@ -81,7 +95,7 @@ async function main() {
     eventName: "Claimed",
   });
 
-  const claimed = events[0]?.args.amount ?? estimatedPayout;
+  const claimed = (events[0]?.args as { amount?: bigint } | undefined)?.amount ?? estimatedPayout;
   console.log(`\n✅ Claimed: ${formatEther(claimed)} STT`);
   console.log(`Tx: ${hash}`);
 }

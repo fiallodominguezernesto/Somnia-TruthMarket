@@ -8,18 +8,18 @@ import {
   formatEther,
   type PublicClient,
 } from "viem";
-import { readFileSync } from "fs";
-import { dirname, join } from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-const PLATFORM = "0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776" as const;
+import {
+  KINDS,
+  OUTCOMES,
+  PLATFORM,
+  loadDeployed,
+  loadMarkets,
+  withRetry,
+  type MarketTuple,
+} from "./_lib.js";
 
 /** Human-readable request status labels by enum index. */
 const RESPONSE_STATUS = ["None", "Pending", "Success", "Failed", "TimedOut"];
-/** Human-readable market outcomes by enum index. */
-const OUTCOMES = ["Open", "YES", "NO", "UNKNOWN"];
 /** Maximum block range per `getLogs` query on Somnia. */
 const BLOCK_WINDOW = 1000n;
 
@@ -126,28 +126,36 @@ async function scanEvents(
 ): Promise<string[]> {
   const resolvedEvent = parseAbiItem("event MarketResolved(uint256 indexed id, uint8 outcome)");
   const textEvent = parseAbiItem("event ResolutionText(uint256 indexed id, string text)");
-  const latest = await publicClient.getBlockNumber();
+  const latest = await withRetry(() => publicClient.getBlockNumber(), { label: "getBlockNumber" });
 
   const found: string[] = [];
   for (let from = fromBlock; from <= latest; from += BLOCK_WINDOW) {
     const to = from + BLOCK_WINDOW - 1n > latest ? latest : from + BLOCK_WINDOW - 1n;
 
-    const textLogs = await publicClient.getLogs({
-      address,
-      event: textEvent,
-      fromBlock: from,
-      toBlock: to,
-    });
+    const textLogs = await withRetry(
+      () =>
+        publicClient.getLogs({
+          address,
+          event: textEvent,
+          fromBlock: from,
+          toBlock: to,
+        }),
+      { label: `getLogs ResolutionText ${from}-${to}` }
+    );
     for (const log of textLogs) {
       found.push(`  ResolutionText(market ${log.args.id}): "${log.args.text}"`);
     }
 
-    const resolvedLogs = await publicClient.getLogs({
-      address,
-      event: resolvedEvent,
-      fromBlock: from,
-      toBlock: to,
-    });
+    const resolvedLogs = await withRetry(
+      () =>
+        publicClient.getLogs({
+          address,
+          event: resolvedEvent,
+          fromBlock: from,
+          toBlock: to,
+        }),
+      { label: `getLogs MarketResolved ${from}-${to}` }
+    );
     for (const log of resolvedLogs) {
       found.push(`  MarketResolved(market ${log.args.id}): ${OUTCOMES[Number(log.args.outcome)]}`);
     }
@@ -164,13 +172,11 @@ async function main() {
   const { viem } = await network.create();
   const publicClient = (await viem.getPublicClient()) as unknown as PublicClient;
 
-  const { TruthMarket: address } = JSON.parse(
-    readFileSync(join(__dirname, "deployed.json"), "utf-8")
-  );
+  const { TruthMarket: address } = loadDeployed();
 
   let marketId: bigint;
   try {
-    const { marketIds } = JSON.parse(readFileSync(join(__dirname, "markets.json"), "utf-8"));
+    const { marketIds } = loadMarkets(address);
     marketId = BigInt(process.env.MARKET_ID ?? marketIds[0]);
   } catch {
     marketId = BigInt(process.env.MARKET_ID ?? "1");
@@ -182,12 +188,17 @@ async function main() {
   console.log("=".repeat(70));
 
   const contract = await viem.getContractAt("TruthMarket", address);
-  const market = await contract.read.markets([marketId]);
-  const requestId = market[5] as bigint;
+  const market = await withRetry(
+    () => contract.read.markets([marketId]) as Promise<MarketTuple>,
+    { label: `markets(${marketId})` }
+  );
+  const requestId = market[5];
+  const kind = market[8];
 
   console.log("\n[MARKET STATE]");
   console.log(`  question : "${market[0]}"`);
-  console.log(`  outcome  : ${OUTCOMES[Number(market[4])]}`);
+  console.log(`  kind     : ${KINDS[kind] ?? `unknown(${kind})`}`);
+  console.log(`  outcome  : ${OUTCOMES[market[4]]}`);
   console.log(`  requestId: ${requestId}`);
 
   if (requestId === 0n) {
@@ -202,7 +213,10 @@ async function main() {
   let resolveBlock = 0n;
 
   if (resolveTx) {
-    const receipt = await publicClient.getTransactionReceipt({ hash: resolveTx });
+    const receipt = await withRetry(
+      () => publicClient.getTransactionReceipt({ hash: resolveTx }),
+      { label: `getTransactionReceipt(${resolveTx})` }
+    );
     resolveBlock = receipt.blockNumber;
 
     const created = parseEventLogs({
@@ -224,7 +238,7 @@ async function main() {
       const payload = event.payload as `0x${string}`;
       const sentSelector = payload.slice(0, 10);
       const selectorOk = sentSelector === expectedSelector ? "yes" : "no";
-      console.log(`  payload selector: ${sentSelector} (matches expected: ${selectorOk})`);
+      console.log(`  payload selector: ${sentSelector} (matches inferString: ${selectorOk})`);
 
       try {
         const decoded = decodeFunctionData({ abi: LLM_ABI, data: payload });
@@ -234,7 +248,7 @@ async function main() {
         console.log(`  allowedValues : ${JSON.stringify(decoded.args[3])}`);
       } catch (error) {
         const message = (error as Error).message.split("\n")[0];
-        console.log(`  Warning: could not decode payload as inferString: ${message}`);
+        console.log(`  Note: payload selector doesn't match inferString — likely a JSON API or Parse Website request (${message}).`);
       }
     }
   } else {
@@ -242,22 +256,30 @@ async function main() {
   }
 
   console.log(`\n[Request on platform ${PLATFORM}]`);
-  const exists = await publicClient.readContract({
-    address: PLATFORM,
-    abi: PLATFORM_ABI,
-    functionName: "hasRequest",
-    args: [requestId],
-  });
+  const exists = await withRetry(
+    () =>
+      publicClient.readContract({
+        address: PLATFORM,
+        abi: PLATFORM_ABI,
+        functionName: "hasRequest",
+        args: [requestId],
+      }),
+    { label: "platform.hasRequest" }
+  );
 
   if (!exists) {
     console.log("  Warning: platform no longer has this requestId (possibly already purged).");
   } else {
-    const req = (await publicClient.readContract({
-      address: PLATFORM,
-      abi: PLATFORM_ABI,
-      functionName: "getRequest",
-      args: [requestId],
-    })) as any;
+    const req = await withRetry(
+      () =>
+        publicClient.readContract({
+          address: PLATFORM,
+          abi: PLATFORM_ABI,
+          functionName: "getRequest",
+          args: [requestId],
+        }),
+      { label: "platform.getRequest" }
+    );
 
     console.log(`  status global  : ${RESPONSE_STATUS[Number(req.status)]} (${req.status})`);
     console.log(`  subcommittee   : ${req.subcommittee.length} validators`);
@@ -268,7 +290,7 @@ async function main() {
     console.log(`  remainingBudget: ${formatEther(req.remainingBudget)} STT`);
 
     console.log(`\n  Individual responses (${req.responses.length}):`);
-    req.responses.forEach((response: any, index: number) => {
+    req.responses.forEach((response, index: number) => {
       console.log(`   [${index}] validator=${response.validator}`);
       console.log(
         `       status=${RESPONSE_STATUS[Number(response.status)]}  executionCost=${formatEther(response.executionCost)} STT`
@@ -283,7 +305,8 @@ async function main() {
     });
   }
 
-  const defaultFrom = (await publicClient.getBlockNumber()) - 5000n;
+  const latestBlock = await withRetry(() => publicClient.getBlockNumber(), { label: "getBlockNumber" });
+  const defaultFrom = latestBlock - 5000n;
   const scanFrom = resolveBlock > 0n ? resolveBlock : defaultFrom;
   console.log(`\n[Contract events from block ${scanFrom}]`);
   const events = await scanEvents(publicClient, address, scanFrom > 0n ? scanFrom : 0n);

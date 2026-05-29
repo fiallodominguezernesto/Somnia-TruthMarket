@@ -152,10 +152,12 @@ const COMPARATORS = [">", ">=", "<", "<="];
 
 // Budget on top of getRequestDeposit() so the agent subcommittee can run.
 // Too little here makes the agent fail and the market resolves UNKNOWN.
-// WEB_FACT needs a larger top-up because resolution chains two agent calls
-// (Parse Website -> LLM Inference) and reserves the LLM budget on-chain.
+// WEB_FACT needs ~2x the top-up because resolution chains two agent calls
+// (Parse Website -> LLM Inference). The contract reserves ~1.2 STT for the
+// chained LLM stage and the script must also fund the Parse Website stage,
+// so we send `2 * deposit + 2.4 STT` total (~1.2 STT topup per stage).
 const RESOLVE_TOPUP = parseEther("1.2");
-const RESOLVE_TOPUP_WEB_FACT = parseEther("2.0");
+const RESOLVE_TOPUP_WEB_FACT = parseEther("2.4");
 
 // Minimum creation fee enforced by the contract (MIN_CREATION_FEE). The fee
 // becomes the resolver bounty for that market.
@@ -367,14 +369,24 @@ $("resolveBtn").addEventListener("click", async () => {
     const marketId = BigInt(els.actionMarketId.value);
     const market = await contract.read.markets([marketId]);
     const kind = Number(market[8]);
-    const topUp = kind === 2 ? RESOLVE_TOPUP_WEB_FACT : RESOLVE_TOPUP;
     const deposit = await publicClient.readContract({
       address: PLATFORM,
       abi: platformAbi,
       functionName: "getRequestDeposit",
     });
-    const value = deposit + topUp;
-    log(`${KINDS[kind] || "market"} resolve: deposit ${formatEther(deposit)} + top-up ${formatEther(topUp)} = ${formatEther(value)} STT`);
+    // WEB_FACT chains Parse Website (stage 1) -> LLM Inference (stage 2). The
+    // contract reserves a stage-2 LLM budget of `deposit + 1.2 STT`, so the
+    // caller must send `2 * deposit + 2.4 STT` total to leave Parse with a
+    // real budget after the reserve. STATEMENT/PRICE single-stage flows just
+    // need `deposit + 1.2 STT`.
+    const value =
+      kind === 2
+        ? deposit * 2n + RESOLVE_TOPUP_WEB_FACT
+        : deposit + RESOLVE_TOPUP;
+    const topupLabel = kind === 2
+      ? `${formatEther(RESOLVE_TOPUP_WEB_FACT)} STT split across 2 stages`
+      : `${formatEther(RESOLVE_TOPUP)} STT`;
+    log(`${KINDS[kind] || "market"} resolve: deposit ${formatEther(deposit)} + top-up ${topupLabel} = ${formatEther(value)} STT`);
     const hash = await contract.write.resolveMarket([marketId], { account, value });
     await waitTx(hash);
     log(`Resolution requested for market #${marketId}. Wait for async agent callback.`);

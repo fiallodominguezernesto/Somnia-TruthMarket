@@ -1,10 +1,8 @@
 import { network } from "hardhat";
-import { parseEventLogs, parseEther } from "viem";
-import { readFileSync, writeFileSync } from "fs";
-import { dirname, join } from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import { parseEventLogs, parseEther, type PublicClient } from "viem";
+import { writeFileSync } from "fs";
+import { join } from "path";
+import { SCRIPTS_DIR, loadDeployed, withRetry } from "./_lib.js";
 
 /** Verifiable historical facts with clear LLM answers. */
 const QUESTIONS = [
@@ -24,11 +22,40 @@ const CREATION_FEE_STT = process.env.CREATION_FEE_STT ?? "0.02";
 /** Comparator enum mapping (matches contract): GT=0, GTE=1, LT=2, LTE=3. */
 const COMPARATORS: Record<string, number> = { gt: 0, gte: 1, lt: 2, lte: 3 };
 
+/** Hardhat-viem's typed contract client is opaque; relax to any so tuple
+ *  args and write calls type-check without re-declaring every signature. */
+type ContractClient = any; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+/**
+ * Reads the MarketCreated event id from the receipt logs via parseEventLogs.
+ * Wraps the (intentionally permissive) viem typing in one place so callers
+ * can stay strict-typed.
+ */
+function extractMarketId(contract: ContractClient, logs: readonly unknown[]): bigint {
+  const events = parseEventLogs({
+    abi: contract.abi,
+    // viem's typing for `logs` is wider than what we hand in (we always pass a
+    // receipt's logs which match `Log[]`); cast here once.
+    logs: logs as never,
+    eventName: "MarketCreated",
+  }) as unknown as Array<{ args: { id: bigint } }>;
+  const id = events[0]?.args.id;
+  if (id === undefined) {
+    throw new Error("MarketCreated event not found in receipt logs");
+  }
+  return id;
+}
+
 /**
  * Creates a PRICE market settled deterministically by the JSON API agent.
  * Configurable via env vars, with a BTC > target preset for the quick demo.
  */
-async function createPriceMarket(contract: any, publicClient: any, deadline: bigint, bounty: bigint) {
+async function createPriceMarket(
+  contract: ContractClient,
+  publicClient: PublicClient,
+  deadline: bigint,
+  bounty: bigint
+): Promise<string> {
   const apiUrl =
     process.env.API_URL ??
     "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd";
@@ -40,13 +67,19 @@ async function createPriceMarket(contract: any, publicClient: any, deadline: big
     process.env.QUESTION ??
     `BTC/USD ${process.env.COMPARATOR ?? "gt"} ${target} at resolution time.`;
 
-  const hash = await contract.write.createPriceMarket(
-    [question, deadline, apiUrl, jsonSelector, decimals, target, comparator],
-    { value: bounty }
+  const hash = await withRetry(
+    () =>
+      contract.write.createPriceMarket(
+        [question, deadline, apiUrl, jsonSelector, decimals, target, comparator],
+        { value: bounty }
+      ) as Promise<`0x${string}`>,
+    { label: "createPriceMarket" }
   );
-  const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  const [event] = parseEventLogs({ abi: contract.abi, logs: receipt.logs, eventName: "MarketCreated" });
-  const id = event.args.id!;
+  const receipt = await withRetry(
+    () => publicClient.waitForTransactionReceipt({ hash }),
+    { label: `waitForTransactionReceipt(${hash})` }
+  );
+  const id = extractMarketId(contract, receipt.logs);
   console.log(`✅ PRICE Market #${id}: "${question}"`);
   console.log(`   source: ${apiUrl} [${jsonSelector}] ${process.env.COMPARATOR ?? "gt"} ${target} (decimals ${decimals})`);
   return id.toString();
@@ -56,19 +89,30 @@ async function createPriceMarket(contract: any, publicClient: any, deadline: big
  * Creates a WEB_FACT market settled by chaining Parse Website -> LLM Inference.
  * Configurable via env vars, with an AFCON-style preset for the quick demo.
  */
-async function createWebFactMarket(contract: any, publicClient: any, deadline: bigint, bounty: bigint) {
+async function createWebFactMarket(
+  contract: ContractClient,
+  publicClient: PublicClient,
+  deadline: bigint,
+  bounty: bigint
+): Promise<string> {
   const sourceUrl = process.env.SOURCE_URL ?? "https://en.wikipedia.org/wiki/Bitcoin";
   const question =
     process.env.QUESTION ??
     "Bitcoin was created by a person or group under the name Satoshi Nakamoto.";
 
-  const hash = await contract.write.createWebFactMarket(
-    [question, deadline, sourceUrl],
-    { value: bounty }
+  const hash = await withRetry(
+    () =>
+      contract.write.createWebFactMarket(
+        [question, deadline, sourceUrl],
+        { value: bounty }
+      ) as Promise<`0x${string}`>,
+    { label: "createWebFactMarket" }
   );
-  const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  const [event] = parseEventLogs({ abi: contract.abi, logs: receipt.logs, eventName: "MarketCreated" });
-  const id = event.args.id!;
+  const receipt = await withRetry(
+    () => publicClient.waitForTransactionReceipt({ hash }),
+    { label: `waitForTransactionReceipt(${hash})` }
+  );
+  const id = extractMarketId(contract, receipt.logs);
   console.log(`✅ WEB_FACT Market #${id}: "${question}"`);
   console.log(`   source: ${sourceUrl} (Parse Website -> LLM Inference)`);
   return id.toString();
@@ -82,11 +126,9 @@ async function main() {
   const kind = (process.env.MARKET_KIND ?? "statement").toLowerCase();
   const fullDemo = (process.env.FULL_DEMO ?? "false").toLowerCase() === "true";
   const selectedQuestions = fullDemo ? QUESTIONS : [QUICK_DEMO_QUESTION];
-  const { TruthMarket: address } = JSON.parse(
-    readFileSync(join(__dirname, "deployed.json"), "utf-8")
-  );
+  const { TruthMarket: address } = loadDeployed();
 
-  const publicClient = await viem.getPublicClient();
+  const publicClient = (await viem.getPublicClient()) as unknown as PublicClient;
   const contract = await viem.getContractAt("TruthMarket", address);
   const deadline = BigInt(Math.floor(Date.now() / 1000) + DEADLINE_SECONDS);
 
@@ -99,16 +141,17 @@ async function main() {
     marketIds.push(await createWebFactMarket(contract, publicClient, deadline, bounty));
   } else {
     for (const question of selectedQuestions) {
-      const hash = await contract.write.createMarket([question, deadline], { value: bounty });
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      const hash = await withRetry(
+        () =>
+          contract.write.createMarket([question, deadline], { value: bounty }) as Promise<`0x${string}`>,
+        { label: "createMarket" }
+      );
+      const receipt = await withRetry(
+        () => publicClient.waitForTransactionReceipt({ hash }),
+        { label: `waitForTransactionReceipt(${hash})` }
+      );
 
-      const [event] = parseEventLogs({
-        abi: contract.abi,
-        logs: receipt.logs,
-        eventName: "MarketCreated",
-      });
-
-      const id = event.args.id!;
+      const id = extractMarketId(contract, receipt.logs);
       console.log(`✅ Market #${id}: "${question}" (bounty ${CREATION_FEE_STT} STT)`);
       marketIds.push(id.toString());
     }
@@ -122,7 +165,7 @@ async function main() {
   }
 
   writeFileSync(
-    join(__dirname, "markets.json"),
+    join(SCRIPTS_DIR, "markets.json"),
     JSON.stringify({ address, marketIds }, null, 2)
   );
   console.log("Saved → scripts/markets.json");

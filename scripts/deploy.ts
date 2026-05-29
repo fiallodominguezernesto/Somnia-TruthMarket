@@ -1,9 +1,7 @@
 import { network } from "hardhat";
 import { writeFileSync } from "fs";
-import { dirname, join } from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import { join } from "path";
+import { SCRIPTS_DIR, withRetry, type DeployedJson } from "./_lib.js";
 
 /**
  * Deploys TruthMarket and persists deployment metadata for other scripts.
@@ -43,23 +41,20 @@ async function main() {
   console.log(`Using JSON API agent ID: ${jsonApiAgentId}`);
   console.log(`Using Parse Website agent ID: ${parseAgentId}`);
 
-  const contract = await viem.deployContract("TruthMarket", [llmAgentId, jsonApiAgentId, parseAgentId]);
+  const contract = await withRetry(
+    () => viem.deployContract("TruthMarket", [llmAgentId, jsonApiAgentId, parseAgentId]),
+    { label: "deployContract(TruthMarket)" }
+  );
   console.log(`\nTruthMarket deployed at: ${contract.address}`);
 
-  writeFileSync(
-    join(__dirname, "deployed.json"),
-    JSON.stringify(
-      {
-        TruthMarket: contract.address,
-        network: "somniaTestnet",
-        llmAgentId: llmAgentId.toString(),
-        jsonApiAgentId: jsonApiAgentId.toString(),
-        parseAgentId: parseAgentId.toString(),
-      },
-      null,
-      2
-    )
-  );
+  const deployed: DeployedJson = {
+    TruthMarket: contract.address,
+    network: "somniaTestnet",
+    llmAgentId: llmAgentId.toString(),
+    jsonApiAgentId: jsonApiAgentId.toString(),
+    parseAgentId: parseAgentId.toString(),
+  };
+  writeFileSync(join(SCRIPTS_DIR, "deployed.json"), JSON.stringify(deployed, null, 2));
   console.log("Saved → scripts/deployed.json");
 }
 

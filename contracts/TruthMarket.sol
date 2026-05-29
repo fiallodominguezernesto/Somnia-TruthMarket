@@ -25,8 +25,15 @@ contract TruthMarket {
     uint256 constant MIN_CREATION_FEE = 0.02 ether;
     /// @notice Default validator subcommittee size used to size chained budgets.
     uint256 constant SUBCOMMITTEE_SIZE = 3;
-    /// @notice LLM Inference cost per validator, reserved for the WEB_FACT stage 2.
-    uint256 constant COST_LLM = 0.07 ether;
+    /// @notice LLM Inference per-validator budget reserved for the WEB_FACT
+    /// stage-2 chained request. The protocol-documented runtime *floor* is
+    /// ~0.07 STT per validator, but in practice an inference that completes
+    /// reliably on testnet needs more headroom — the empirically validated
+    /// total topup is ~1.2 STT per stage (0.4 STT × 3 validators). Setting
+    /// the constant to that realistic budget keeps the on-chain reservation
+    /// in line with what STATEMENT/PRICE markets already send, so WEB_FACT's
+    /// stage-2 LLM doesn't TimedOut at runtime.
+    uint256 constant COST_LLM = 0.4 ether;
 
     /// @param _llmAgentId LLM Inference agent ID from Somnia Agent Explorer.
     /// @param _jsonApiAgentId JSON API Request agent ID from Somnia Agent Explorer.

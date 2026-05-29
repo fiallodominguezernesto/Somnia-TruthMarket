@@ -166,7 +166,7 @@ Expected output (minimum):
 npm run resolve-market
 ```
 
-- Default resolve value is `getRequestDeposit() + 1.2 STT` (STATEMENT/PRICE), or `+ 2.0 STT` for WEB_FACT (it chains Parse Website -> LLM Inference and reserves the LLM budget on-chain).
+- Default resolve value is `deposit + 1.2 STT` (STATEMENT/PRICE single-stage). WEB_FACT chains Parse Website -> LLM Inference and reserves the LLM budget on-chain, so the script sends `2*deposit + 2.4 STT` total (~1.2 STT topup per stage).
 - Optional: `RESOLVE_TOPUP_STT=0.8 npm run resolve-market`.
 - Optional market: `MARKET_ID=2 npm run resolve-market`.
 - For WEB_FACT the script prints the `EvidenceExtracted` event (the text the Parse Website agent returned) before the LLM verdict.
@@ -178,7 +178,7 @@ npm run keeper
 ```
 
 - Keeper scans markets continuously, resolves expired `Open` markets, and collects bounty.
-- It reads each market's kind on-chain and sizes the top-up automatically (`1.2 STT`, or `2.0 STT` for WEB_FACT).
+- It reads each market's kind on-chain and sizes the value automatically (`deposit + 1.2 STT`, or `2*deposit + 2.4 STT` for WEB_FACT to fund both chained stages).
 - Optional scan interval: `KEEPER_SCAN_MS=5000 npm run keeper`.
 
 Expected output (minimum):
@@ -219,7 +219,7 @@ python3 -m http.server 8080 --bind 0.0.0.0
 6. Load market snapshot and note the market ID.
 7. Place bet using that exact market ID.
 8. After deadline passes, click `Resolve Manually (agent)`.
-   - The UI auto-detects the kind and sends deposit + `1.2 STT` (or `2.0 STT` for WEB_FACT).
+   - The UI auto-detects the kind and sends `deposit + 1.2 STT`, or `2*deposit + 2.4 STT` for WEB_FACT (so the chained Parse Website + LLM Inference stages each get ~1.2 STT topup).
    - Or run `npm run keeper` in terminal and let it resolve autonomously.
 9. Reload snapshot until outcome changes from `Open`. For WEB_FACT the snapshot also shows the evidence extracted by the Parse Website agent; for PRICE it shows the fetched condition.
 10. Click `Claim Winnings` using the same market ID.
@@ -427,7 +427,7 @@ Salida esperada (minima):
 npm run resolve-market
 ```
 
-- El valor por defecto es `getRequestDeposit() + 1.2 STT` (STATEMENT/PRICE), o `+ 2.0 STT` para WEB_FACT (encadena Parse Website -> LLM Inference y reserva el presupuesto del LLM on-chain).
+- El valor por defecto es `deposit + 1.2 STT` (STATEMENT/PRICE de una sola etapa). WEB_FACT encadena Parse Website -> LLM Inference y reserva el presupuesto del LLM on-chain, asi que el script envia `2*deposit + 2.4 STT` total (~1.2 STT de topup por etapa).
 - Opcional: `RESOLVE_TOPUP_STT=0.8 npm run resolve-market`.
 - Mercado especifico: `MARKET_ID=2 npm run resolve-market`.
 - Para WEB_FACT el script imprime el evento `EvidenceExtracted` (el texto que devolvio el agente Parse Website) antes del veredicto del LLM.
@@ -439,7 +439,7 @@ npm run keeper
 ```
 
 - El keeper escanea mercados continuamente, resuelve los vencidos en `Open`, y cobra bounty.
-- Lee el tipo de cada mercado on-chain y ajusta el top-up automaticamente (`1.2 STT`, o `2.0 STT` para WEB_FACT).
+- Lee el tipo de cada mercado on-chain y ajusta el valor automaticamente (`deposit + 1.2 STT`, o `2*deposit + 2.4 STT` para WEB_FACT, repartido entre las dos etapas encadenadas).
 - Intervalo opcional: `KEEPER_SCAN_MS=5000 npm run keeper`.
 
 Salida esperada (minima):
@@ -480,7 +480,7 @@ python3 -m http.server 8080 --bind 0.0.0.0
 6. Carga el snapshot y anota el market ID.
 7. Apuesta usando ese mismo market ID.
 8. Cuando pase el deadline, pulsa `Resolve Manually (agent)`.
-   - La UI detecta el tipo y envia deposito + `1.2 STT` (o `2.0 STT` para WEB_FACT).
+   - La UI detecta el tipo y envia `deposit + 1.2 STT`, o `2*deposit + 2.4 STT` para WEB_FACT (para que las etapas encadenadas Parse Website + LLM Inference reciban ~1.2 STT de topup cada una).
    - O ejecuta `npm run keeper` en terminal para resolucion autonoma.
 9. Recarga snapshot hasta que outcome deje de ser `Open`. Para WEB_FACT el snapshot muestra ademas la evidencia extraida por el agente Parse Website; para PRICE muestra la condicion obtenida.
 10. Pulsa `Claim Winnings` con el mismo market ID.

@@ -1,19 +1,14 @@
 import { network } from "hardhat";
 import { formatEther, parseEther } from "viem";
-import { readFileSync } from "fs";
-import { dirname, join } from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import { loadDeployed, loadMarkets, withRetry } from "./_lib.js";
 
 /**
  * Places demo bets for quick mode or full mode using scripts/markets.json.
  */
 async function main() {
   const { viem } = await network.create();
-  const { address, marketIds } = JSON.parse(
-    readFileSync(join(__dirname, "markets.json"), "utf-8")
-  );
+  const { TruthMarket: deployedAddress } = loadDeployed();
+  const { address, marketIds } = loadMarkets(deployedAddress);
 
   const publicClient = await viem.getPublicClient();
   const contract = await viem.getContractAt("TruthMarket", address);
@@ -34,8 +29,14 @@ async function main() {
 
   for (const { marketId, isYes, amount, label } of bets) {
     try {
-      const hash = await contract.write.placeBet([marketId, isYes], { value: amount });
-      await publicClient.waitForTransactionReceipt({ hash });
+      const hash = await withRetry(
+        () => contract.write.placeBet([marketId, isYes], { value: amount }) as Promise<`0x${string}`>,
+        { label: `placeBet(${marketId}, ${isYes})` }
+      );
+      await withRetry(
+        () => publicClient.waitForTransactionReceipt({ hash }),
+        { label: `waitForTransactionReceipt(${hash})` }
+      );
       console.log(`✅ Market #${marketId} → ${label} — ${formatEther(amount)} STT  [${hash.slice(0, 10)}…]`);
     } catch (error) {
       console.log(`⚠️ Market #${marketId} skipped (${label}): ${(error as Error).message.split("\n")[0]}`);

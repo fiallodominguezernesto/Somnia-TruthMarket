@@ -175,24 +175,32 @@ Environment variables reference:
 | `PRIVATE_KEY` | none | deploy/scripts/keeper | signer wallet |
 | `SOMNIA_RPC_URL` | testnet RPC | all scripts | chain endpoint |
 | `LLM_AGENT_ID` | none | deploy/sim-platform | real LLM Inference agent ID injected at deploy (STATEMENT + WEB_FACT) |
-| `JSON_API_AGENT_ID` | none | deploy | real JSON API Request agent ID injected at deploy (PRICE) |
-| `PARSE_AGENT_ID` | none | deploy | real LLM Parse Website agent ID injected at deploy (WEB_FACT) |
+| `JSON_API_AGENT_ID` | none | deploy/sim-platform | real JSON API Request agent ID injected at deploy (PRICE) |
+| `PARSE_AGENT_ID` | none | deploy/sim-platform | real LLM Parse Website agent ID injected at deploy (WEB_FACT) |
+| `AGENT` | `statement` | sim-platform | which base agent to dry-run: `statement` (LLM Inference), `price` (JSON API Request), or `web_fact` (LLM Parse Website) |
 | `MARKET_KIND` | `statement` | create-market | market type: `statement`, `price`, or `web_fact` |
 | `CREATION_FEE_STT` | `0.02` | create-market | bounty amount paid by market creator |
-| `RESOLVE_TOPUP_STT` | `1.2` (`2.0` for WEB_FACT) | resolve-market/keeper | extra value on top of platform deposit |
+| `RESOLVE_TOPUP_STT` | `1.2` per stage (WEB_FACT gets 2 stages) | resolve-market/keeper | per-stage top-up above the platform deposit; sized to fund LLM/JSON/Parse agent execution |
 | `KEEPER_SCAN_MS` | `10000` | keeper | scan interval in milliseconds |
 | `MARKET_ID` | first in `markets.json` | resolve-market/claim/diagnose | target market override |
 | `FULL_DEMO` | `false` | create-market/place-bet | full 3-market, 6-bet demo mode |
 
 The agent IDs are already provided in `.env.example`. If you ever need to confirm or replace one, open the Agent Explorer at `https://agents.testnet.somnia.network`, select the agent (**LLM Inference**, **JSON API Request**, or **LLM Parse Website**), open the **Solidity** tab, and copy the `agentId`. A placeholder/unregistered ID makes `resolveMarket` revert with no reason when it calls `platform.createRequest`. The contract reads these IDs at deploy time (constructor args), so set them before `npm run deploy`.
 
-Verify an agent ID is valid before deploying (no funds spent):
+Verify an agent ID is valid before deploying (no funds spent). Pick which of the 3 agents to dry-run with `AGENT=statement|price|web_fact` (default `statement`):
 
 ```bash
-LLM_AGENT_ID=<id> npm run sim-platform
+# default — LLM Inference (STATEMENT verdict path)
+npm run sim-platform
+
+# JSON API Request (PRICE markets)
+AGENT=price npm run sim-platform
+
+# LLM Parse Website (WEB_FACT stage 1 evidence extraction)
+AGENT=web_fact npm run sim-platform
 ```
 
-Note: `sim-platform` can run before `npm run deploy`; it no longer requires `scripts/deployed.json`.
+Note: `sim-platform` can run before `npm run deploy`; it no longer requires `scripts/deployed.json`. The agent-specific selectors are: `inferString(string,string,bool,string[])` for `statement`, `fetchUint(string,string,uint8)` for `price`, and `ExtractString(string,string,string[],string,string,bool,uint8,uint8)` for `web_fact`.
 
 Fund the wallet from faucet:
 
@@ -214,7 +222,7 @@ npm run build
 - `npm run keeper` - run the autonomous resolver agent (continuous loop)
 - `npm run claim` - claim payout/refund
 - `npm run diagnose` - inspect resolve tx and decode request internals
-- `npm run sim-platform` - dry-run `platform.createRequest` using your current `LLM_AGENT_ID`
+- `npm run sim-platform` - dry-run `platform.createRequest` against one of the 3 Somnia base agents (`AGENT=statement|price|web_fact`, default `statement`)
 
 ## Script Flow (Detailed)
 
@@ -289,7 +297,7 @@ npm run resolve-market
 Behavior:
 - Waits if deadline not reached yet
 - Sends `getRequestDeposit() + top-up`
-- Default top-up: `1.2 STT` for STATEMENT/PRICE, `2.0 STT` for WEB_FACT (the chained Parse Website -> LLM Inference flow reserves the LLM budget on-chain, so it needs a larger top-up)
+- Default top-up: `1.2 STT` per stage. STATEMENT and PRICE are single-stage flows, so the script sends `deposit + 1.2 STT`. WEB_FACT chains Parse Website -> LLM Inference, so the script sends `2*deposit + 2.4 STT` to fund both stages (the contract reserves `deposit + 1.2 STT` on-chain for the chained LLM call, the rest goes to the Parse Website stage)
 - Override example: `RESOLVE_TOPUP_STT=0.6 npm run resolve-market`
 - For WEB_FACT, the script parses the `EvidenceExtracted` event and prints the evidence the Parse Website agent returned before the LLM verdict
 
@@ -309,7 +317,7 @@ npm run keeper
 
 Behavior:
 - Scans on an interval (default `10s`, override with `KEEPER_SCAN_MS`)
-- Sends `getRequestDeposit() + top-up` per resolution (`RESOLVE_TOPUP_STT`, default `1.2`, automatically `2.0` for WEB_FACT markets)
+- Sends `getRequestDeposit() + top-up` per resolution; `RESOLVE_TOPUP_STT` (default `1.2`) is the **per-stage** top-up. STATEMENT/PRICE use 1 stage; WEB_FACT uses 2 stages, so the keeper sends `2*deposit + 2*top-up` (~2.4 STT) automatically
 - Resolves all three market kinds; reads each market's kind on-chain to size the top-up correctly
 - Skips markets already being resolved; rechecks if a callback is slow
 - Runs continuously until stopped (`Ctrl+C`)
@@ -386,7 +394,7 @@ UI sequence:
   - WEB_FACT: a Source URL field appears (pre-filled with the Bitcoin Wikipedia page)
 - Create market (60s default, increase to 120-180s if you need more signing time)
 - Place bet using the same market ID
-- Optional manual resolve after deadline (UI auto-detects the kind and sends deposit + `1.2 STT`, or `2.0 STT` for WEB_FACT)
+- Optional manual resolve after deadline (UI auto-detects the kind and sends `deposit + 1.2 STT` for STATEMENT/PRICE, or `2*deposit + 2.4 STT` for WEB_FACT so each chained stage gets ~1.2 STT)
 - Or run `npm run keeper` and watch autonomous settlement (UI supports auto-refresh)
 - Load the **Market Snapshot** to see the kind, PRICE condition, or — for WEB_FACT — the evidence extracted by the Parse Website agent
 - Claim using the same market ID after outcome is not `Open`
@@ -414,9 +422,9 @@ What diagnose shows:
 
 Recent autonomous run (keeper-driven):
 
-- Contract: `0xe1808e511f1a7b53ea53591ad38162ba7c7660c1`
-- Keeper resolve tx: `0x3271d043e9ff3b8f9bcc608406d372f1622eeef8ab9da9b20173fbb2e72d78be`
-- Claim tx: `0x9f0f00d2befbffdf642096e78bbd6e56aedc0b30fc6502b3e4e3c4e6e33b8294`
+- Contract: `0xb5435c87b207b43a882678834814903944ebf22e`
+- Keeper resolve tx: `0x3d5ea0e1e372546814df5148634355ce63c4155fd153eaa652e6b24b0f976bbf`
+- Claim tx: `0x4755cc756d24ea165ef58045cd5aa74913a4cde22f545c23e13ce37473d33aec`
 
 This run demonstrates autonomous discovery of expired markets, agent-mediated settlement, and successful payout claim.
 

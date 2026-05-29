@@ -239,7 +239,7 @@
           <label>Market ID</label>
           <input id="actionMarketId" type="number" min="1" value="1" />
           <button id="resolveBtn" class="secondary">Resolve Manually (agent)</button>
-          <div class="status">Optional. After the deadline the keeper agent (<span class="mono">npm run keeper</span>) resolves markets automatically and earns the bounty. Manual resolve sends platform deposit + top-up (1.2 STT, or 2.0 STT for WEB_FACT to fund the chained LLM stage).</div>
+          <div class="status">Optional. After the deadline the keeper agent (<span class="mono">npm run keeper</span>) resolves markets automatically and earns the bounty. Manual resolve sends platform deposit + top-up (1.2 STT for STATEMENT/PRICE; for WEB_FACT the script sends 2×deposit + 2.4 STT total so each chained stage gets ~1.2 STT).</div>
           <button id="claimBtn" class="danger">Claim Winnings</button>
         </div>
       </article>

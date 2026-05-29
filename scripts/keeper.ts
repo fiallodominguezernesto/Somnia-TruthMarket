@@ -1,44 +1,22 @@
 import { network } from "hardhat";
-import { parseEther } from "viem";
-import { readFileSync } from "fs";
-import { dirname, join } from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-const PLATFORM = "0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776" as const;
-const PLATFORM_ABI = [
-  {
-    name: "getRequestDeposit",
-    type: "function" as const,
-    stateMutability: "view" as const,
-    inputs: [],
-    outputs: [{ name: "", type: "uint256" }],
-  },
-] as const;
-
-/** Human-readable market outcomes by enum index. */
-const OUTCOMES = ["Open", "YES", "NO", "UNKNOWN"];
+import {
+  OUTCOMES,
+  computeResolveValue,
+  getPlatformDeposit,
+  loadDeployed,
+  withRetry,
+  type MarketTuple,
+} from "./_lib.js";
 
 // How often the keeper scans for expired markets.
 const SCAN_MS = Number(process.env.KEEPER_SCAN_MS ?? 10_000);
-// Top-up sent on top of the platform deposit, same convention as resolveMarket.ts.
-const TOPUP_STT = process.env.RESOLVE_TOPUP_STT ?? "1.2";
-
-// Market struct field order from TruthMarket.sol (only the leading fields are
-// read here; trailing PRICE/WEB_FACT fields are ignored):
-// [question, deadline, yesPool, noPool, outcome, requestId, bounty, resolver,
-//  kind, apiUrl, jsonSelector, decimals, target, comparator, sourceUrl, resolveBudget]
-type MarketTuple = readonly [string, bigint, bigint, bigint, number, bigint, bigint, string, number, ...unknown[]];
 
 /**
  * Runs an autonomous keeper loop that resolves expired, still-open markets.
  */
 async function main() {
   const { viem } = await network.create();
-  const { TruthMarket: address } = JSON.parse(
-    readFileSync(join(__dirname, "deployed.json"), "utf-8")
-  );
+  const { TruthMarket: address } = loadDeployed();
 
   const publicClient = await viem.getPublicClient();
   const [wallet] = await viem.getWalletClients();
@@ -56,13 +34,19 @@ async function main() {
    */
   async function scan() {
     const nowSec = BigInt(Math.floor(Date.now() / 1000));
-    const count = (await contract.read.marketCount()) as bigint;
+    const count = await withRetry(
+      () => contract.read.marketCount() as Promise<bigint>,
+      { label: "marketCount" }
+    );
 
     for (let id = 1n; id <= count; id++) {
       const key = id.toString();
       if (inFlight.has(key)) continue;
 
-      const m = (await contract.read.markets([id])) as MarketTuple;
+      const m = (await withRetry(
+        () => contract.read.markets([id]) as Promise<MarketTuple>,
+        { label: `markets(${id})` }
+      ));
       const deadline = m[1];
       const outcome = m[4];
       const requestId = m[5];
@@ -85,24 +69,27 @@ async function main() {
    */
   async function resolve(id: bigint, bounty: bigint, kind: number) {
     try {
-      const deposit = (await publicClient.readContract({
-        address: PLATFORM,
-        abi: PLATFORM_ABI,
-        functionName: "getRequestDeposit",
-      })) as bigint;
-      // WEB_FACT (kind 2) chains two agent requests, so it needs a larger top-up.
-      const topup = kind === 2 ? (process.env.RESOLVE_TOPUP_STT ?? "2.0") : TOPUP_STT;
-      const value = deposit + parseEther(topup);
+      const deposit = await getPlatformDeposit(publicClient);
+      const value = computeResolveValue(kind, deposit);
 
       console.log(`→ Market #${id} expired. Resolving autonomously (bounty ${bounty} wei)...`);
-      const hash = await contract.write.resolveMarket([id], { value });
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      const hash = await withRetry(
+        () => contract.write.resolveMarket([id], { value }),
+        { label: `resolveMarket(${id})` }
+      );
+      const receipt = await withRetry(
+        () => publicClient.waitForTransactionReceipt({ hash }),
+        { label: `waitForTransactionReceipt(${hash})` }
+      );
       console.log(`  resolveMarket tx ${hash} in block ${receipt.blockNumber}`);
 
       // Confirm settlement once the async LLM callback lands.
       await waitForResolution(id);
-    } catch (err: any) {
-      console.error(`  ✗ Market #${id} resolve failed: ${err?.shortMessage ?? err?.message ?? err}`);
+    } catch (err: unknown) {
+      const message = (err as { shortMessage?: string; message?: string })?.shortMessage
+        ?? (err as { message?: string })?.message
+        ?? String(err);
+      console.error(`  ✗ Market #${id} resolve failed: ${message}`);
     }
   }
 
@@ -112,10 +99,20 @@ async function main() {
   async function waitForResolution(id: bigint) {
     const deadline = Date.now() + 180_000;
     while (Date.now() < deadline) {
-      const m = (await contract.read.markets([id])) as MarketTuple;
-      if (m[4] !== 0) {
-        console.log(`  ✅ Market #${id} settled → ${OUTCOMES[m[4]] ?? m[4]}`);
-        return;
+      try {
+        const m = await withRetry(
+          () => contract.read.markets([id]) as Promise<MarketTuple>,
+          { label: `markets(${id}) settle-poll` }
+        );
+        if (m[4] !== 0) {
+          console.log(`  ✅ Market #${id} settled → ${OUTCOMES[m[4]] ?? m[4]}`);
+          return;
+        }
+      } catch (err: unknown) {
+        const message = (err as { shortMessage?: string; message?: string })?.shortMessage
+          ?? (err as { message?: string })?.message
+          ?? String(err);
+        console.warn(`  ⚠️ Market #${id} settle poll error: ${message.split("\n")[0].slice(0, 160)}`);
       }
       await new Promise((r) => setTimeout(r, 5_000));
     }
@@ -125,7 +122,10 @@ async function main() {
   // Run forever.
   await scan();
   setInterval(() => {
-    scan().catch((e) => console.error("scan error:", e?.message ?? e));
+    scan().catch((e: unknown) => {
+      const message = (e as { message?: string })?.message ?? String(e);
+      console.error("scan error:", message);
+    });
   }, SCAN_MS);
 }
 

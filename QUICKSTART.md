@@ -130,7 +130,7 @@ SOURCE_URL="https://en.wikipedia.org/wiki/Bitcoin" \
 npm run create-market
 ```
 
-Then bet/resolve/claim as usual. WEB_FACT resolution automatically uses a `2.0 STT` top-up (vs `1.2 STT` for the others) because it chains two agent calls.
+Then bet/resolve/claim as usual. WEB_FACT resolution automatically sends `2*deposit + 2.4 STT` (vs `deposit + 1.2 STT` for the others) so both chained stages (Parse Website + LLM Inference) get a real ~1.2 STT topup each.
 
 ## 4) Optional: Diagnose UNKNOWN
 
@@ -150,4 +150,4 @@ python3 -m http.server 8080 --bind 0.0.0.0
 
 Open `http://localhost:8080`, connect wallet, set contract address from `scripts/deployed.json`, then create -> bet -> resolve -> claim.
 
-UI note: in **Create Market** pick the **Market Kind** (STATEMENT / PRICE / WEB_FACT) — extra fields appear for PRICE and WEB_FACT. Market creation includes the bounty fee, and resolve auto-detects the kind to size the top-up (`1.2 STT`, or `2.0 STT` for WEB_FACT). The **Market Snapshot** shows the PRICE condition or the WEB_FACT evidence extracted by the Parse Website agent.
+UI note: in **Create Market** pick the **Market Kind** (STATEMENT / PRICE / WEB_FACT) — extra fields appear for PRICE and WEB_FACT. Market creation includes the bounty fee, and resolve auto-detects the kind to size the top-up (`deposit + 1.2 STT` for STATEMENT/PRICE; `2*deposit + 2.4 STT` for WEB_FACT, split across its two chained stages). The **Market Snapshot** shows the PRICE condition or the WEB_FACT evidence extracted by the Parse Website agent.
