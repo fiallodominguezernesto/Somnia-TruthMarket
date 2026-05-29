@@ -147,11 +147,55 @@
         </div>
       </article>
 
-      <article class="card">
+      <article class="card card-wide">
         <h2>2) Create Market</h2>
         <div class="row">
-          <label>Question</label>
+          <label>Market Kind (Somnia agent)</label>
+          <select id="marketKind">
+            <option value="statement">STATEMENT — LLM Inference judges a fact</option>
+            <option value="price">PRICE — JSON API fetches a number</option>
+            <option value="web_fact">WEB_FACT — Parse Website → LLM (chained)</option>
+          </select>
+          <label>Question / Statement</label>
           <textarea id="question" placeholder="Is this statement true? ...">2 + 2 equals 4.</textarea>
+
+          <div id="priceFields" style="display:none">
+            <div class="row two">
+              <div>
+                <label>API URL (JSON endpoint)</label>
+                <input id="apiUrl" value="https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd" />
+              </div>
+              <div>
+                <label>JSON Selector</label>
+                <input id="jsonSelector" value="bitcoin.usd" />
+              </div>
+            </div>
+            <div class="row two" style="margin-top:10px">
+              <div>
+                <label>Target</label>
+                <input id="target" type="number" min="0" value="1000" />
+              </div>
+              <div>
+                <label>Comparator (fetched CMP target → YES)</label>
+                <select id="comparator">
+                  <option value="0">&gt; (GT)</option>
+                  <option value="1">&gt;= (GTE)</option>
+                  <option value="2">&lt; (LT)</option>
+                  <option value="3">&lt;= (LTE)</option>
+                </select>
+              </div>
+            </div>
+            <div style="margin-top:10px">
+              <label>Decimals (scale applied to fetched value)</label>
+              <input id="decimals" type="number" min="0" max="18" value="0" />
+            </div>
+          </div>
+
+          <div id="webFactFields" style="display:none">
+            <label>Source URL (parsed by Parse Website agent)</label>
+            <input id="sourceUrl" value="https://en.wikipedia.org/wiki/Bitcoin" />
+          </div>
+
           <div class="row two">
             <div>
               <label>Deadline Seconds From Now</label>
@@ -163,7 +207,7 @@
             </div>
           </div>
           <button id="createBtn">Create Market</button>
-          <div class="status">Bounty (min 0.02 STT) funds the reward paid to whoever resolves this market — the keeper or any agent.</div>
+          <div class="status" id="createHint">Bounty (min 0.02 STT) funds the reward paid to whoever resolves this market — the keeper or any agent.</div>
         </div>
       </article>
 
@@ -194,8 +238,8 @@
         <div class="row">
           <label>Market ID</label>
           <input id="actionMarketId" type="number" min="1" value="1" />
-          <button id="resolveBtn" class="secondary">Resolve Manually (LLM)</button>
-          <div class="status">Optional. After the deadline the keeper agent (<span class="mono">npm run keeper</span>) resolves markets automatically and earns the bounty. Manual resolve sends platform deposit + 1.2 STT top-up.</div>
+          <button id="resolveBtn" class="secondary">Resolve Manually (agent)</button>
+          <div class="status">Optional. After the deadline the keeper agent (<span class="mono">npm run keeper</span>) resolves markets automatically and earns the bounty. Manual resolve sends platform deposit + top-up (1.2 STT, or 2.0 STT for WEB_FACT to fund the chained LLM stage).</div>
           <button id="claimBtn" class="danger">Claim Winnings</button>
         </div>
       </article>

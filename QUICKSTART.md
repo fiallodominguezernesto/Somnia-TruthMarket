@@ -41,7 +41,12 @@ cp .env.example .env
 
 - `PRIVATE_KEY=0x...`
 - `SOMNIA_RPC_URL=https://api.infra.testnet.somnia.network`
-- `LLM_AGENT_ID=<real LLM Inference agent ID>`
+
+The three agent IDs are already pre-filled in `.env.example` (so you usually only add `PRIVATE_KEY`):
+
+- `LLM_AGENT_ID=12847293847561029384` — LLM Inference (STATEMENT + WEB_FACT)
+- `JSON_API_AGENT_ID=13174292974160097713` — JSON API Request (PRICE)
+- `PARSE_AGENT_ID=12875401142070969085` — LLM Parse Website (WEB_FACT)
 
 6. Fund wallet with testnet STT:
 
@@ -102,6 +107,31 @@ MARKET_ID=1 npm run resolve-market
 MARKET_ID=1 npm run claim
 ```
 
+## 3b) Try the Three Market Kinds
+
+`create-market` selects the agent flow via `MARKET_KIND` (default `statement`):
+
+```bash
+# STATEMENT — LLM Inference judges a fact
+QUESTION="2 + 2 equals 4." npm run create-market
+
+# PRICE — JSON API Request fetches a number and compares it
+#   COMPARATOR: 0 GT, 1 GTE, 2 LT, 3 LTE ; fetched value scaled by DECIMALS
+MARKET_KIND=price \
+QUESTION="Is BTC above 1000 USD?" \
+API_URL="https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd" \
+JSON_SELECTOR="bitcoin.usd" DECIMALS=0 TARGET=1000 COMPARATOR=0 \
+npm run create-market
+
+# WEB_FACT — LLM Parse Website extracts evidence, then chained LLM Inference judges it
+MARKET_KIND=web_fact \
+QUESTION="Did Satoshi Nakamoto create Bitcoin?" \
+SOURCE_URL="https://en.wikipedia.org/wiki/Bitcoin" \
+npm run create-market
+```
+
+Then bet/resolve/claim as usual. WEB_FACT resolution automatically uses a `2.0 STT` top-up (vs `1.2 STT` for the others) because it chains two agent calls.
+
 ## 4) Optional: Diagnose UNKNOWN
 
 ```bash
@@ -120,4 +150,4 @@ python3 -m http.server 8080 --bind 0.0.0.0
 
 Open `http://localhost:8080`, connect wallet, set contract address from `scripts/deployed.json`, then create -> bet -> resolve -> claim.
 
-UI note: market creation includes bounty fee, and resolve sends deposit + top-up.
+UI note: in **Create Market** pick the **Market Kind** (STATEMENT / PRICE / WEB_FACT) — extra fields appear for PRICE and WEB_FACT. Market creation includes the bounty fee, and resolve auto-detects the kind to size the top-up (`1.2 STT`, or `2.0 STT` for WEB_FACT). The **Market Snapshot** shows the PRICE condition or the WEB_FACT evidence extracted by the Parse Website agent.

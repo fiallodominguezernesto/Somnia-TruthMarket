@@ -35,6 +35,32 @@ const truthMarketAbi = [
   },
   {
     type: "function",
+    name: "createPriceMarket",
+    stateMutability: "payable",
+    inputs: [
+      { name: "question", type: "string" },
+      { name: "deadline", type: "uint256" },
+      { name: "apiUrl", type: "string" },
+      { name: "jsonSelector", type: "string" },
+      { name: "decimals", type: "uint8" },
+      { name: "target", type: "uint256" },
+      { name: "comparator", type: "uint8" },
+    ],
+    outputs: [{ name: "id", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "createWebFactMarket",
+    stateMutability: "payable",
+    inputs: [
+      { name: "question", type: "string" },
+      { name: "deadline", type: "uint256" },
+      { name: "sourceUrl", type: "string" },
+    ],
+    outputs: [{ name: "id", type: "uint256" }],
+  },
+  {
+    type: "function",
     name: "placeBet",
     stateMutability: "payable",
     inputs: [
@@ -71,7 +97,22 @@ const truthMarketAbi = [
       { name: "requestId", type: "uint256" },
       { name: "bounty", type: "uint256" },
       { name: "resolver", type: "address" },
+      { name: "kind", type: "uint8" },
+      { name: "apiUrl", type: "string" },
+      { name: "jsonSelector", type: "string" },
+      { name: "decimals", type: "uint8" },
+      { name: "target", type: "uint256" },
+      { name: "comparator", type: "uint8" },
+      { name: "sourceUrl", type: "string" },
+      { name: "resolveBudget", type: "uint256" },
     ],
+  },
+  {
+    type: "function",
+    name: "evidence",
+    stateMutability: "view",
+    inputs: [{ name: "", type: "uint256" }],
+    outputs: [{ name: "", type: "string" }],
   },
   {
     type: "function",
@@ -106,10 +147,15 @@ const platformAbi = [
 ];
 
 const OUTCOMES = ["Open", "YES", "NO", "UNKNOWN"];
+const KINDS = ["STATEMENT", "PRICE", "WEB_FACT"];
+const COMPARATORS = [">", ">=", "<", "<="];
 
-// Budget on top of getRequestDeposit() so the LLM subcommittee can run inference.
+// Budget on top of getRequestDeposit() so the agent subcommittee can run.
 // Too little here makes the agent fail and the market resolves UNKNOWN.
+// WEB_FACT needs a larger top-up because resolution chains two agent calls
+// (Parse Website -> LLM Inference) and reserves the LLM budget on-chain.
 const RESOLVE_TOPUP = parseEther("1.2");
+const RESOLVE_TOPUP_WEB_FACT = parseEther("2.0");
 
 // Minimum creation fee enforced by the contract (MIN_CREATION_FEE). The fee
 // becomes the resolver bounty for that market.
@@ -132,7 +178,16 @@ const $ = (id) => document.getElementById(id);
 const els = {
   account: $("account"),
   address: $("contractAddress"),
+  marketKind: $("marketKind"),
   question: $("question"),
+  priceFields: $("priceFields"),
+  webFactFields: $("webFactFields"),
+  apiUrl: $("apiUrl"),
+  jsonSelector: $("jsonSelector"),
+  decimals: $("decimals"),
+  target: $("target"),
+  comparator: $("comparator"),
+  sourceUrl: $("sourceUrl"),
   deadlineSeconds: $("deadlineSeconds"),
   feeAmount: $("feeAmount"),
   betMarketId: $("betMarketId"),
@@ -147,6 +202,20 @@ const els = {
 };
 
 els.address.value = contractAddress;
+
+/**
+ * Shows the extra input fields that match the selected market kind.
+ * STATEMENT needs nothing extra, PRICE needs the JSON API config and
+ * WEB_FACT needs the source URL the Parse Website agent will read.
+ */
+function syncMarketKindFields() {
+  const kind = els.marketKind.value;
+  els.priceFields.style.display = kind === "price" ? "" : "none";
+  els.webFactFields.style.display = kind === "web_fact" ? "" : "none";
+}
+
+els.marketKind.addEventListener("change", syncMarketKindFields);
+syncMarketKindFields();
 
 /**
  * Prepends a timestamped line to the UI log panel.
@@ -231,6 +300,7 @@ $("createBtn").addEventListener("click", async () => {
   try {
     requireWallet();
     const contract = getContractClient();
+    const kind = els.marketKind.value;
     const question = els.question.value.trim();
     if (!question) throw new Error("Question cannot be empty.");
     const secs = Number(els.deadlineSeconds.value);
@@ -238,9 +308,38 @@ $("createBtn").addEventListener("click", async () => {
     const fee = parseEther(els.feeAmount.value || "0.02");
     if (fee < MIN_CREATION_FEE) throw new Error("Bounty must be at least 0.02 STT.");
     const deadline = BigInt(Math.floor(Date.now() / 1000) + secs);
-    const hash = await contract.write.createMarket([question, deadline], { account, value: fee });
+
+    let hash;
+    if (kind === "price") {
+      const apiUrl = els.apiUrl.value.trim();
+      const jsonSelector = els.jsonSelector.value.trim();
+      if (!apiUrl) throw new Error("API URL cannot be empty for a PRICE market.");
+      if (!jsonSelector) throw new Error("JSON selector cannot be empty for a PRICE market.");
+      const decimals = Number(els.decimals.value || "0");
+      if (!Number.isInteger(decimals) || decimals < 0 || decimals > 18) {
+        throw new Error("Decimals must be an integer between 0 and 18.");
+      }
+      const target = BigInt(els.target.value);
+      const comparator = Number(els.comparator.value);
+      hash = await contract.write.createPriceMarket(
+        [question, deadline, apiUrl, jsonSelector, decimals, target, comparator],
+        { account, value: fee },
+      );
+      log(`PRICE market: ${apiUrl} [${jsonSelector}] ${COMPARATORS[comparator]} ${target} (10^${decimals}).`);
+    } else if (kind === "web_fact") {
+      const sourceUrl = els.sourceUrl.value.trim();
+      if (!sourceUrl) throw new Error("Source URL cannot be empty for a WEB_FACT market.");
+      hash = await contract.write.createWebFactMarket(
+        [question, deadline, sourceUrl],
+        { account, value: fee },
+      );
+      log(`WEB_FACT market: Parse Website will read ${sourceUrl}, then LLM judges it.`);
+    } else {
+      hash = await contract.write.createMarket([question, deadline], { account, value: fee });
+    }
+
     await waitTx(hash);
-    log(`Market created with ${formatEther(fee)} STT resolver bounty.`);
+    log(`${KINDS[["statement", "price", "web_fact"].indexOf(kind)]} market created with ${formatEther(fee)} STT resolver bounty.`);
   } catch (error) {
     log(`Create failed: ${error.message}`);
   }
@@ -266,16 +365,19 @@ $("resolveBtn").addEventListener("click", async () => {
     requireWallet();
     const contract = getContractClient();
     const marketId = BigInt(els.actionMarketId.value);
+    const market = await contract.read.markets([marketId]);
+    const kind = Number(market[8]);
+    const topUp = kind === 2 ? RESOLVE_TOPUP_WEB_FACT : RESOLVE_TOPUP;
     const deposit = await publicClient.readContract({
       address: PLATFORM,
       abi: platformAbi,
       functionName: "getRequestDeposit",
     });
-    const value = deposit + RESOLVE_TOPUP;
-    log(`Deposit ${formatEther(deposit)} + top-up ${formatEther(RESOLVE_TOPUP)} = ${formatEther(value)} STT`);
+    const value = deposit + topUp;
+    log(`${KINDS[kind] || "market"} resolve: deposit ${formatEther(deposit)} + top-up ${formatEther(topUp)} = ${formatEther(value)} STT`);
     const hash = await contract.write.resolveMarket([marketId], { account, value });
     await waitTx(hash);
-    log(`Resolution requested for market #${marketId}. Wait for async callback.`);
+    log(`Resolution requested for market #${marketId}. Wait for async agent callback.`);
   } catch (error) {
     log(`Resolve failed: ${error.message}`);
   }
@@ -326,9 +428,27 @@ async function loadMarket(marketId) {
     ]);
   }
 
-  const [question, deadline, yesPool, noPool, outcome, requestId, bounty, resolver] = market;
+  const [
+    question,
+    deadline,
+    yesPool,
+    noPool,
+    outcome,
+    requestId,
+    bounty,
+    resolver,
+    kind,
+    apiUrl,
+    jsonSelector,
+    decimals,
+    target,
+    comparator,
+    sourceUrl,
+  ] = market;
+
   const snapshot = {
     marketId: marketId.toString(),
+    kind: KINDS[Number(kind)] || "Unknown",
     question,
     status: resolutionStatus(outcome, requestId, deadline, resolver),
     deadlineLocal: new Date(Number(deadline) * 1000).toLocaleString(),
@@ -343,6 +463,20 @@ async function loadMarket(marketId) {
     yourYesBetSTT: formatEther(yesBet),
     yourNoBetSTT: formatEther(noBet),
   };
+
+  if (Number(kind) === 1) {
+    snapshot.priceFeed = apiUrl;
+    snapshot.jsonSelector = jsonSelector;
+    snapshot.condition = `value ${COMPARATORS[Number(comparator)] || "?"} ${target.toString()} (scaled 10^${Number(decimals)})`;
+  } else if (Number(kind) === 2) {
+    snapshot.sourceUrl = sourceUrl;
+    try {
+      const extracted = await contract.read.evidence([marketId]);
+      snapshot.evidence = extracted && extracted.length ? extracted : "(not extracted yet)";
+    } catch (error) {
+      snapshot.evidence = "(unavailable)";
+    }
+  }
 
   els.marketView.textContent = JSON.stringify(snapshot, null, 2);
   return { outcome: Number(outcome), requestId };

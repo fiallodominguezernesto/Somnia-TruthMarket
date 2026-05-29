@@ -2,7 +2,13 @@
 
 Autonomous micro prediction market MVP for Somnia Agentathon.
 
-Somnia TruthMarket is a fully on-chain prediction workflow where users create factual YES/NO markets, fund positions with STT, and let the protocol finalize outcomes through Somnia's agent infrastructure. After each market reaches its deadline, the contract emits an asynchronous request to the LLM Inference agent and receives a callback that updates settlement state to `YES`, `NO`, or `UNKNOWN`.
+Somnia TruthMarket is a fully on-chain prediction workflow where users create factual YES/NO markets, fund positions with STT, and let the protocol finalize outcomes through Somnia's native agent infrastructure. Each market reaches its deadline and the contract emits an asynchronous request to a Somnia agent, then receives a callback that updates settlement state to `YES`, `NO`, or `UNKNOWN`.
+
+The protocol supports three market kinds, each wired to a different native Somnia agent:
+
+- **STATEMENT** — judged by the **LLM Inference** agent. The agent reads the statement and returns a YES/NO verdict (e.g. "2 + 2 equals 4").
+- **PRICE** — resolved by the **JSON API Request** agent. The agent fetches a live JSON endpoint, extracts a numeric field, scales it by `decimals`, and compares it to `target` with the chosen comparator (e.g. "Is BTC above 100,000 USD?").
+- **WEB_FACT** — the flagship multi-agent flow. The **LLM Parse Website** agent reads a public web page and extracts the relevant evidence, then that evidence is chained into the **LLM Inference** agent which judges the YES/NO question against it (e.g. "Did Satoshi Nakamoto create Bitcoin?" against the Bitcoin Wikipedia page). This demonstrates autonomous on-chain orchestration of two chained agents in a single resolution.
 
 The system is designed to run as an autonomous loop instead of a one-off manual script. Market resolution is permissionless and economically incentivized: each new market includes a resolver bounty, and any actor can trigger resolution once expiration is reached. A keeper agent (`scripts/keeper.ts`) continuously scans expired markets, submits resolve transactions, and captures the bounty while the contract handles final state transitions and payouts.
 
@@ -18,10 +24,14 @@ System flow (high-level):
 
 ```text
 User/Script/UI
-   -> TruthMarket.createMarket / placeBet
+   -> TruthMarket.createMarket / createPriceMarket / createWebFactMarket
+   -> TruthMarket.placeBet
    -> TruthMarket.resolveMarket
    -> Somnia Platform.createRequest
-   -> LLM Inference Agent execution
+   -> Native agent execution
+        STATEMENT  : LLM Inference
+        PRICE      : JSON API Request
+        WEB_FACT   : LLM Parse Website -> (chained) LLM Inference
    -> Platform callback to TruthMarket.handleResolution
    -> TruthMarket settles outcome + claim payout/refund
 ```
@@ -81,9 +91,14 @@ Set at least:
 
 - `PRIVATE_KEY=0x...`
 - `SOMNIA_RPC_URL=https://api.infra.testnet.somnia.network`
-- `LLM_AGENT_ID=...` (real LLM Inference agent ID)
-- `JSON_API_AGENT_ID=...` (real JSON API Request agent ID)
-- `PARSE_AGENT_ID=...` (real LLM Parse Website agent ID)
+
+The three agent IDs are already pre-filled in `.env.example` (and therefore in your `.env` after copying), so the project is testable out of the box:
+
+- `LLM_AGENT_ID=12847293847561029384` (LLM Inference — STATEMENT + WEB_FACT)
+- `JSON_API_AGENT_ID=13174292974160097713` (JSON API Request — PRICE)
+- `PARSE_AGENT_ID=12875401142070969085` (LLM Parse Website — WEB_FACT)
+
+You normally only need to add your own `PRIVATE_KEY`.
 
 5) Validate setup and build
 
@@ -97,9 +112,11 @@ npm run build
 - Network: Somnia Testnet (Chain ID `50312`)
 - RPC: `https://api.infra.testnet.somnia.network`
 - Platform contract: `0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776`
-- LLM Inference Agent ID: configured at deploy time via `LLM_AGENT_ID` in `.env`
-- JSON API Request Agent ID: configured at deploy time via `JSON_API_AGENT_ID` in `.env`
-- LLM Parse Website Agent ID: configured at deploy time via `PARSE_AGENT_ID` in `.env`
+- LLM Inference Agent ID: `12847293847561029384` (via `LLM_AGENT_ID`) — STATEMENT verdicts and the chained WEB_FACT judging stage
+- JSON API Request Agent ID: `13174292974160097713` (via `JSON_API_AGENT_ID`) — PRICE markets
+- LLM Parse Website Agent ID: `12875401142070969085` (via `PARSE_AGENT_ID`) — WEB_FACT evidence extraction
+
+All three agents are native Somnia agents available on Testnet and Mainnet under the same agent IDs. The contract reads all three IDs at deploy time (constructor args).
 
 ## Tech Stack
 
@@ -144,9 +161,12 @@ Set at least:
 
 - `PRIVATE_KEY=0x...`
 - `SOMNIA_RPC_URL=https://api.infra.testnet.somnia.network`
-- `LLM_AGENT_ID=...` — the real LLM Inference agent ID
-- `JSON_API_AGENT_ID=...` — the real JSON API Request agent ID (PRICE markets)
-- `PARSE_AGENT_ID=...` — the real LLM Parse Website agent ID (WEB_FACT markets)
+
+The three agent IDs ship pre-filled in `.env.example`, so after `cp .env.example .env` you only need to add `PRIVATE_KEY`:
+
+- `LLM_AGENT_ID=12847293847561029384` — LLM Inference agent ID (STATEMENT + WEB_FACT)
+- `JSON_API_AGENT_ID=13174292974160097713` — JSON API Request agent ID (PRICE markets)
+- `PARSE_AGENT_ID=12875401142070969085` — LLM Parse Website agent ID (WEB_FACT markets)
 
 Environment variables reference:
 
@@ -164,7 +184,7 @@ Environment variables reference:
 | `MARKET_ID` | first in `markets.json` | resolve-market/claim/diagnose | target market override |
 | `FULL_DEMO` | `false` | create-market/place-bet | full 3-market, 6-bet demo mode |
 
-Get the real `LLM_AGENT_ID` from the Agent Explorer: open `https://agents.testnet.somnia.network`, select the **LLM Inference** agent, open the **Solidity** tab, and copy the `agentId`. A placeholder/unregistered ID makes `resolveMarket` revert with no reason when it calls `platform.createRequest`. The contract reads this ID at deploy time (constructor arg), so set it before `npm run deploy`.
+The agent IDs are already provided in `.env.example`. If you ever need to confirm or replace one, open the Agent Explorer at `https://agents.testnet.somnia.network`, select the agent (**LLM Inference**, **JSON API Request**, or **LLM Parse Website**), open the **Solidity** tab, and copy the `agentId`. A placeholder/unregistered ID makes `resolveMarket` revert with no reason when it calls `platform.createRequest`. The contract reads these IDs at deploy time (constructor args), so set them before `npm run deploy`.
 
 Verify an agent ID is valid before deploying (no funds spent):
 
@@ -220,6 +240,36 @@ Behavior:
 - IDs written to `scripts/markets.json`
 - Each market is created with a bounty (default `0.02 STT`, override with `CREATION_FEE_STT`). The contract requires at least `MIN_CREATION_FEE` (`0.02 STT`). This bounty is paid to whoever resolves the market.
 
+Choose the market kind with `MARKET_KIND` (default `statement`):
+
+STATEMENT (LLM Inference) — default:
+
+```bash
+QUESTION="2 + 2 equals 4." npm run create-market
+```
+
+PRICE (JSON API Request) — fetch a number and compare it to a target. Comparators: `0` GT, `1` GTE, `2` LT, `3` LTE. The fetched value is scaled by `DECIMALS` before comparison:
+
+```bash
+MARKET_KIND=price \
+QUESTION="Is BTC above 1000 USD?" \
+API_URL="https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd" \
+JSON_SELECTOR="bitcoin.usd" \
+DECIMALS=0 \
+TARGET=1000 \
+COMPARATOR=0 \
+npm run create-market
+```
+
+WEB_FACT (LLM Parse Website -> chained LLM Inference) — parse a page, extract evidence, then judge the question against it:
+
+```bash
+MARKET_KIND=web_fact \
+QUESTION="Did Satoshi Nakamoto create Bitcoin?" \
+SOURCE_URL="https://en.wikipedia.org/wiki/Bitcoin" \
+npm run create-market
+```
+
 3) Place bets
 
 ```bash
@@ -239,8 +289,9 @@ npm run resolve-market
 Behavior:
 - Waits if deadline not reached yet
 - Sends `getRequestDeposit() + top-up`
-- Default top-up: `1.2 STT`
+- Default top-up: `1.2 STT` for STATEMENT/PRICE, `2.0 STT` for WEB_FACT (the chained Parse Website -> LLM Inference flow reserves the LLM budget on-chain, so it needs a larger top-up)
 - Override example: `RESOLVE_TOPUP_STT=0.6 npm run resolve-market`
+- For WEB_FACT, the script parses the `EvidenceExtracted` event and prints the evidence the Parse Website agent returned before the LLM verdict
 
 Optional specific market:
 
@@ -258,7 +309,8 @@ npm run keeper
 
 Behavior:
 - Scans on an interval (default `10s`, override with `KEEPER_SCAN_MS`)
-- Sends `getRequestDeposit() + top-up` per resolution (`RESOLVE_TOPUP_STT`, default `1.2`)
+- Sends `getRequestDeposit() + top-up` per resolution (`RESOLVE_TOPUP_STT`, default `1.2`, automatically `2.0` for WEB_FACT markets)
+- Resolves all three market kinds; reads each market's kind on-chain to size the top-up correctly
 - Skips markets already being resolved; rechecks if a callback is slow
 - Runs continuously until stopped (`Ctrl+C`)
 
@@ -328,10 +380,15 @@ Open in browser:
 UI sequence:
 - Connect wallet
 - Paste deployed contract address from `scripts/deployed.json`
+- In **Create Market**, pick the **Market Kind**:
+  - STATEMENT: just type the statement
+  - PRICE: extra fields appear — API URL, JSON selector, target, comparator, decimals (pre-filled with a CoinGecko BTC example)
+  - WEB_FACT: a Source URL field appears (pre-filled with the Bitcoin Wikipedia page)
 - Create market (60s default, increase to 120-180s if you need more signing time)
 - Place bet using the same market ID
-- Optional manual resolve after deadline (UI sends deposit + `1.2 STT` top-up)
+- Optional manual resolve after deadline (UI auto-detects the kind and sends deposit + `1.2 STT`, or `2.0 STT` for WEB_FACT)
 - Or run `npm run keeper` and watch autonomous settlement (UI supports auto-refresh)
+- Load the **Market Snapshot** to see the kind, PRICE condition, or — for WEB_FACT — the evidence extracted by the Parse Website agent
 - Claim using the same market ID after outcome is not `Open`
 
 ## Diagnosing UNKNOWN Outcomes

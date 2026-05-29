@@ -47,7 +47,12 @@ cp .env.example .env
 
 - `PRIVATE_KEY=0x...`
 - `SOMNIA_RPC_URL=https://api.infra.testnet.somnia.network`
-- `LLM_AGENT_ID=<real LLM Inference ID>`
+
+The three agent IDs come pre-filled in `.env.example`, so you normally only add `PRIVATE_KEY`:
+
+- `LLM_AGENT_ID=12847293847561029384` — LLM Inference (STATEMENT + WEB_FACT)
+- `JSON_API_AGENT_ID=13174292974160097713` — JSON API Request (PRICE)
+- `PARSE_AGENT_ID=12875401142070969085` — LLM Parse Website (WEB_FACT)
 
 6. Optional but recommended: install Foundry tools:
 
@@ -71,9 +76,9 @@ npm run build
 - Ensure `.env` exists with:
   - `PRIVATE_KEY=0x...`
   - `SOMNIA_RPC_URL=https://api.infra.testnet.somnia.network`
-  - `LLM_AGENT_ID=<real LLM Inference ID>`
+  - `LLM_AGENT_ID`, `JSON_API_AGENT_ID`, `PARSE_AGENT_ID` (already pre-filled in `.env.example`)
 
-Get `LLM_AGENT_ID` from `https://agents.testnet.somnia.network` (LLM Inference -> Solidity tab).
+The agent IDs ship pre-filled in `.env.example`. To confirm or replace one, open `https://agents.testnet.somnia.network` and read the `agentId` from the **Solidity** tab of the LLM Inference / JSON API Request / LLM Parse Website agent.
 
 Optional validation before deploy:
 
@@ -116,6 +121,28 @@ npm run create-market
 - Full mode: `FULL_DEMO=true npm run create-market`.
 - Market creation sends a bounty fee (default `0.02 STT`, override with `CREATION_FEE_STT`).
 
+Pick the market kind (and its agent) with `MARKET_KIND` (default `statement`):
+
+```bash
+# STATEMENT — LLM Inference judges a fact
+QUESTION="2 + 2 equals 4." npm run create-market
+
+# PRICE — JSON API Request fetches a number and compares it to TARGET
+#   COMPARATOR: 0 GT, 1 GTE, 2 LT, 3 LTE ; fetched value is scaled by DECIMALS
+MARKET_KIND=price \
+QUESTION="Is BTC above 1000 USD?" \
+API_URL="https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd" \
+JSON_SELECTOR="bitcoin.usd" DECIMALS=0 TARGET=1000 COMPARATOR=0 \
+npm run create-market
+
+# WEB_FACT — LLM Parse Website extracts evidence from a page,
+#   then chained LLM Inference judges the question against it
+MARKET_KIND=web_fact \
+QUESTION="Did Satoshi Nakamoto create Bitcoin?" \
+SOURCE_URL="https://en.wikipedia.org/wiki/Bitcoin" \
+npm run create-market
+```
+
 Expected output (minimum):
 - `Market #...`
 - `Deadline: ... (+60s)`
@@ -139,9 +166,10 @@ Expected output (minimum):
 npm run resolve-market
 ```
 
-- Default resolve value is `getRequestDeposit() + 1.2 STT`.
+- Default resolve value is `getRequestDeposit() + 1.2 STT` (STATEMENT/PRICE), or `+ 2.0 STT` for WEB_FACT (it chains Parse Website -> LLM Inference and reserves the LLM budget on-chain).
 - Optional: `RESOLVE_TOPUP_STT=0.8 npm run resolve-market`.
 - Optional market: `MARKET_ID=2 npm run resolve-market`.
+- For WEB_FACT the script prints the `EvidenceExtracted` event (the text the Parse Website agent returned) before the LLM verdict.
 
 4b. Autonomous resolve with keeper (agent loop)
 
@@ -150,6 +178,7 @@ npm run keeper
 ```
 
 - Keeper scans markets continuously, resolves expired `Open` markets, and collects bounty.
+- It reads each market's kind on-chain and sizes the top-up automatically (`1.2 STT`, or `2.0 STT` for WEB_FACT).
 - Optional scan interval: `KEEPER_SCAN_MS=5000 npm run keeper`.
 
 Expected output (minimum):
@@ -184,13 +213,15 @@ python3 -m http.server 8080 --bind 0.0.0.0
 3. Connect wallet.
 4. Paste deployed address from `scripts/deployed.json` and click `Save Address`.
 5. Create market.
+   - Pick the **Market Kind**: STATEMENT (just the statement), PRICE (API URL, JSON selector, target, comparator, decimals — pre-filled with a CoinGecko BTC example), or WEB_FACT (a Source URL — pre-filled with the Bitcoin Wikipedia page).
    - Use `180` seconds if you need more signing time.
    - Creation includes bounty fee for resolver incentives.
 6. Load market snapshot and note the market ID.
 7. Place bet using that exact market ID.
-8. After deadline passes, click `Resolve Market (LLM)`.
+8. After deadline passes, click `Resolve Manually (agent)`.
+   - The UI auto-detects the kind and sends deposit + `1.2 STT` (or `2.0 STT` for WEB_FACT).
    - Or run `npm run keeper` in terminal and let it resolve autonomously.
-9. Reload snapshot until outcome changes from `Open`.
+9. Reload snapshot until outcome changes from `Open`. For WEB_FACT the snapshot also shows the evidence extracted by the Parse Website agent; for PRICE it shows the fetched condition.
 10. Click `Claim Winnings` using the same market ID.
 
 ### 4) Diagnose if resolution is UNKNOWN
@@ -277,7 +308,12 @@ cp .env.example .env
 
 - `PRIVATE_KEY=0x...`
 - `SOMNIA_RPC_URL=https://api.infra.testnet.somnia.network`
-- `LLM_AGENT_ID=<ID real de LLM Inference>`
+
+Los tres IDs de agente vienen pre-rellenados en `.env.example`, asi que normalmente solo agregas `PRIVATE_KEY`:
+
+- `LLM_AGENT_ID=12847293847561029384` — LLM Inference (STATEMENT + WEB_FACT)
+- `JSON_API_AGENT_ID=13174292974160097713` — JSON API Request (PRICE)
+- `PARSE_AGENT_ID=12875401142070969085` — LLM Parse Website (WEB_FACT)
 
 6. Opcional pero recomendado: instalar herramientas Foundry:
 
@@ -301,9 +337,9 @@ npm run build
 - Asegura que exista `.env` con:
   - `PRIVATE_KEY=0x...`
   - `SOMNIA_RPC_URL=https://api.infra.testnet.somnia.network`
-  - `LLM_AGENT_ID=<ID real de LLM Inference>`
+  - `LLM_AGENT_ID`, `JSON_API_AGENT_ID`, `PARSE_AGENT_ID` (ya pre-rellenados en `.env.example`)
 
-Obtiene `LLM_AGENT_ID` desde `https://agents.testnet.somnia.network` (LLM Inference -> pestaña Solidity).
+Los IDs de agente vienen pre-rellenados en `.env.example`. Para confirmar o reemplazar uno, abre `https://agents.testnet.somnia.network` y lee el `agentId` en la pestaña **Solidity** del agente LLM Inference / JSON API Request / LLM Parse Website.
 
 Validacion opcional antes de deploy:
 
@@ -346,6 +382,28 @@ npm run create-market
 - Modo completo: `FULL_DEMO=true npm run create-market`.
 - La creacion envia fee de bounty (default `0.02 STT`, override `CREATION_FEE_STT`).
 
+Elige el tipo de mercado (y su agente) con `MARKET_KIND` (default `statement`):
+
+```bash
+# STATEMENT — LLM Inference juzga un hecho
+QUESTION="2 + 2 equals 4." npm run create-market
+
+# PRICE — JSON API Request obtiene un numero y lo compara con TARGET
+#   COMPARATOR: 0 GT, 1 GTE, 2 LT, 3 LTE ; el valor obtenido se escala por DECIMALS
+MARKET_KIND=price \
+QUESTION="Is BTC above 1000 USD?" \
+API_URL="https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd" \
+JSON_SELECTOR="bitcoin.usd" DECIMALS=0 TARGET=1000 COMPARATOR=0 \
+npm run create-market
+
+# WEB_FACT — LLM Parse Website extrae evidencia de una pagina,
+#   y luego el LLM Inference encadenado juzga la pregunta contra ella
+MARKET_KIND=web_fact \
+QUESTION="Did Satoshi Nakamoto create Bitcoin?" \
+SOURCE_URL="https://en.wikipedia.org/wiki/Bitcoin" \
+npm run create-market
+```
+
 Salida esperada (minima):
 - `Market #...`
 - `Deadline: ... (+60s)`
@@ -369,9 +427,10 @@ Salida esperada (minima):
 npm run resolve-market
 ```
 
-- El valor por defecto es `getRequestDeposit() + 1.2 STT`.
+- El valor por defecto es `getRequestDeposit() + 1.2 STT` (STATEMENT/PRICE), o `+ 2.0 STT` para WEB_FACT (encadena Parse Website -> LLM Inference y reserva el presupuesto del LLM on-chain).
 - Opcional: `RESOLVE_TOPUP_STT=0.8 npm run resolve-market`.
 - Mercado especifico: `MARKET_ID=2 npm run resolve-market`.
+- Para WEB_FACT el script imprime el evento `EvidenceExtracted` (el texto que devolvio el agente Parse Website) antes del veredicto del LLM.
 
 4b. Resolucion autonoma con keeper (bucle agente)
 
@@ -380,6 +439,7 @@ npm run keeper
 ```
 
 - El keeper escanea mercados continuamente, resuelve los vencidos en `Open`, y cobra bounty.
+- Lee el tipo de cada mercado on-chain y ajusta el top-up automaticamente (`1.2 STT`, o `2.0 STT` para WEB_FACT).
 - Intervalo opcional: `KEEPER_SCAN_MS=5000 npm run keeper`.
 
 Salida esperada (minima):
@@ -414,13 +474,15 @@ python3 -m http.server 8080 --bind 0.0.0.0
 3. Conecta wallet.
 4. Pega la direccion desplegada desde `scripts/deployed.json` y pulsa `Save Address`.
 5. Crea mercado.
+   - Elige el **Market Kind**: STATEMENT (solo el enunciado), PRICE (API URL, selector JSON, target, comparador, decimales — pre-rellenado con un ejemplo BTC de CoinGecko), o WEB_FACT (un Source URL — pre-rellenado con la pagina de Bitcoin en Wikipedia).
    - Usa `180` segundos si necesitas mas tiempo para firmar.
    - La creacion incluye fee bounty para incentivar al resolver.
 6. Carga el snapshot y anota el market ID.
 7. Apuesta usando ese mismo market ID.
-8. Cuando pase el deadline, pulsa `Resolve Market (LLM)`.
+8. Cuando pase el deadline, pulsa `Resolve Manually (agent)`.
+   - La UI detecta el tipo y envia deposito + `1.2 STT` (o `2.0 STT` para WEB_FACT).
    - O ejecuta `npm run keeper` en terminal para resolucion autonoma.
-9. Recarga snapshot hasta que outcome deje de ser `Open`.
+9. Recarga snapshot hasta que outcome deje de ser `Open`. Para WEB_FACT el snapshot muestra ademas la evidencia extraida por el agente Parse Website; para PRICE muestra la condicion obtenida.
 10. Pulsa `Claim Winnings` con el mismo market ID.
 
 ### 4) Diagnostico si sale UNKNOWN
