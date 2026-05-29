@@ -129,3 +129,33 @@ interface IJsonApiAgent {
         uint8 decimals
     ) external returns (uint256 value);
 }
+
+// LLM Parse Website base agent. Visits `url`, optionally resolving links across
+// `numPages`, and extracts a value guided by `prompt`/`description`. Payload must
+// be function calldata (selector + args).
+interface IParseWebsiteAgent {
+    /// @notice Extracts a free-form string (or one of `options` when non-empty).
+    function ExtractString(
+        string memory key,
+        string memory description,
+        string[] calldata options,
+        string memory prompt,
+        string memory url,
+        bool resolveUrl,
+        uint8 numPages,
+        uint8 confidenceThreshold
+    ) external returns (string memory);
+
+    /// @notice Extracts a numeric value bounded by [min, max].
+    function ExtractANumber(
+        string memory key,
+        string memory description,
+        uint256 min,
+        uint256 max,
+        string memory prompt,
+        string memory url,
+        bool resolveUrl,
+        uint8 numPages,
+        uint8 confidenceThreshold
+    ) external returns (uint256);
+}

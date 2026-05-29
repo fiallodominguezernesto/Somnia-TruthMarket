@@ -82,6 +82,8 @@ Set at least:
 - `PRIVATE_KEY=0x...`
 - `SOMNIA_RPC_URL=https://api.infra.testnet.somnia.network`
 - `LLM_AGENT_ID=...` (real LLM Inference agent ID)
+- `JSON_API_AGENT_ID=...` (real JSON API Request agent ID)
+- `PARSE_AGENT_ID=...` (real LLM Parse Website agent ID)
 
 5) Validate setup and build
 
@@ -96,6 +98,8 @@ npm run build
 - RPC: `https://api.infra.testnet.somnia.network`
 - Platform contract: `0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776`
 - LLM Inference Agent ID: configured at deploy time via `LLM_AGENT_ID` in `.env`
+- JSON API Request Agent ID: configured at deploy time via `JSON_API_AGENT_ID` in `.env`
+- LLM Parse Website Agent ID: configured at deploy time via `PARSE_AGENT_ID` in `.env`
 
 ## Tech Stack
 
@@ -141,6 +145,8 @@ Set at least:
 - `PRIVATE_KEY=0x...`
 - `SOMNIA_RPC_URL=https://api.infra.testnet.somnia.network`
 - `LLM_AGENT_ID=...` — the real LLM Inference agent ID
+- `JSON_API_AGENT_ID=...` — the real JSON API Request agent ID (PRICE markets)
+- `PARSE_AGENT_ID=...` — the real LLM Parse Website agent ID (WEB_FACT markets)
 
 Environment variables reference:
 
@@ -148,9 +154,12 @@ Environment variables reference:
 |---|---:|---|---|
 | `PRIVATE_KEY` | none | deploy/scripts/keeper | signer wallet |
 | `SOMNIA_RPC_URL` | testnet RPC | all scripts | chain endpoint |
-| `LLM_AGENT_ID` | none | deploy/sim-platform | real LLM agent ID injected at deploy |
+| `LLM_AGENT_ID` | none | deploy/sim-platform | real LLM Inference agent ID injected at deploy (STATEMENT + WEB_FACT) |
+| `JSON_API_AGENT_ID` | none | deploy | real JSON API Request agent ID injected at deploy (PRICE) |
+| `PARSE_AGENT_ID` | none | deploy | real LLM Parse Website agent ID injected at deploy (WEB_FACT) |
+| `MARKET_KIND` | `statement` | create-market | market type: `statement`, `price`, or `web_fact` |
 | `CREATION_FEE_STT` | `0.02` | create-market | bounty amount paid by market creator |
-| `RESOLVE_TOPUP_STT` | `1.2` | resolve-market/keeper | extra value on top of platform deposit |
+| `RESOLVE_TOPUP_STT` | `1.2` (`2.0` for WEB_FACT) | resolve-market/keeper | extra value on top of platform deposit |
 | `KEEPER_SCAN_MS` | `10000` | keeper | scan interval in milliseconds |
 | `MARKET_ID` | first in `markets.json` | resolve-market/claim/diagnose | target market override |
 | `FULL_DEMO` | `false` | create-market/place-bet | full 3-market, 6-bet demo mode |

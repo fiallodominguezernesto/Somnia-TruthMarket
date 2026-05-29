@@ -36,6 +36,7 @@ async function pollResolution(
   const event = parseAbiItem("event MarketResolved(uint256 indexed id, uint8 outcome)");
   const textEvent = parseAbiItem("event ResolutionText(uint256 indexed id, string text)");
   const dataEvent = parseAbiItem("event ResolutionData(uint256 indexed id, uint256 value)");
+  const evidenceEvent = parseAbiItem("event EvidenceExtracted(uint256 indexed id, string evidence)");
 
   let searchFrom = startBlock;
 
@@ -58,6 +59,16 @@ async function pollResolution(
 
       if (logs.length > 0) {
         const outcome = OUTCOMES[Number(logs[0].args.outcome)] ?? "Unknown";
+        const evidenceLogs = await publicClient.getLogs({
+          address: contractAddress,
+          event: evidenceEvent,
+          args: { id: marketId },
+          fromBlock: startBlock,
+          toBlock: to,
+        });
+        if (evidenceLogs.length > 0) {
+          console.log(`Parse Website evidence: ${evidenceLogs[evidenceLogs.length - 1].args.evidence}`);
+        }
         const textLogs = await publicClient.getLogs({
           address: contractAddress,
           event: textEvent,
@@ -111,6 +122,7 @@ async function main() {
   const market = await contract.read.markets([marketId]);
   const question = market[0];
   const deadlineTs = market[1];
+  const kind = Number(market[8]); // 0 STATEMENT, 1 PRICE, 2 WEB_FACT
   console.log(`Market #${marketId}: "${question}"`);
   console.log(`Deadline: ${new Date(Number(deadlineTs) * 1000).toLocaleString()}`);
 
@@ -128,7 +140,10 @@ async function main() {
     abi: PLATFORM_ABI,
     functionName: "getRequestDeposit",
   });
-  const topupStt = process.env.RESOLVE_TOPUP_STT ?? "1.2";
+  // WEB_FACT chains two agents (Parse Website + LLM), so it needs a larger
+  // top-up to fund both stages; STATEMENT/PRICE only need a single request.
+  const defaultTopup = kind === 2 ? "2.0" : "1.2";
+  const topupStt = process.env.RESOLVE_TOPUP_STT ?? defaultTopup;
   const topup = parseEther(topupStt);
   const totalValue = deposit + topup;
 

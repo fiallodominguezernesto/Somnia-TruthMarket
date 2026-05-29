@@ -29,12 +29,21 @@ async function main() {
         "https://agents.testnet.somnia.network and add it to .env"
     );
   }
+  const parseIdRaw = process.env.PARSE_AGENT_ID;
+  if (!parseIdRaw) {
+    throw new Error(
+      "PARSE_AGENT_ID is not set. Get the real LLM Parse Website agent ID from " +
+        "https://agents.testnet.somnia.network and add it to .env"
+    );
+  }
   const llmAgentId = BigInt(agentIdRaw);
   const jsonApiAgentId = BigInt(jsonApiIdRaw);
+  const parseAgentId = BigInt(parseIdRaw);
   console.log(`Using LLM agent ID: ${llmAgentId}`);
   console.log(`Using JSON API agent ID: ${jsonApiAgentId}`);
+  console.log(`Using Parse Website agent ID: ${parseAgentId}`);
 
-  const contract = await viem.deployContract("TruthMarket", [llmAgentId, jsonApiAgentId]);
+  const contract = await viem.deployContract("TruthMarket", [llmAgentId, jsonApiAgentId, parseAgentId]);
   console.log(`\nTruthMarket deployed at: ${contract.address}`);
 
   writeFileSync(
@@ -45,6 +54,7 @@ async function main() {
         network: "somniaTestnet",
         llmAgentId: llmAgentId.toString(),
         jsonApiAgentId: jsonApiAgentId.toString(),
+        parseAgentId: parseAgentId.toString(),
       },
       null,
       2

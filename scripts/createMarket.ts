@@ -53,6 +53,28 @@ async function createPriceMarket(contract: any, publicClient: any, deadline: big
 }
 
 /**
+ * Creates a WEB_FACT market settled by chaining Parse Website -> LLM Inference.
+ * Configurable via env vars, with an AFCON-style preset for the quick demo.
+ */
+async function createWebFactMarket(contract: any, publicClient: any, deadline: bigint, bounty: bigint) {
+  const sourceUrl = process.env.SOURCE_URL ?? "https://en.wikipedia.org/wiki/Bitcoin";
+  const question =
+    process.env.QUESTION ??
+    "Bitcoin was created by a person or group under the name Satoshi Nakamoto.";
+
+  const hash = await contract.write.createWebFactMarket(
+    [question, deadline, sourceUrl],
+    { value: bounty }
+  );
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  const [event] = parseEventLogs({ abi: contract.abi, logs: receipt.logs, eventName: "MarketCreated" });
+  const id = event.args.id!;
+  console.log(`✅ WEB_FACT Market #${id}: "${question}"`);
+  console.log(`   source: ${sourceUrl} (Parse Website -> LLM Inference)`);
+  return id.toString();
+}
+
+/**
  * Creates one or more markets and stores generated IDs in scripts/markets.json.
  */
 async function main() {
@@ -73,6 +95,8 @@ async function main() {
 
   if (kind === "price") {
     marketIds.push(await createPriceMarket(contract, publicClient, deadline, bounty));
+  } else if (kind === "web_fact" || kind === "webfact") {
+    marketIds.push(await createWebFactMarket(contract, publicClient, deadline, bounty));
   } else {
     for (const question of selectedQuestions) {
       const hash = await contract.write.createMarket([question, deadline], { value: bounty });
@@ -94,7 +118,7 @@ async function main() {
   console.log(`\n⏰ Deadline: ${expiry.toLocaleTimeString()} (+${DEADLINE_SECONDS}s)`);
   console.log("Run placeBet.ts now, then wait for expiry to resolve.");
   if (!fullDemo && kind !== "price") {
-    console.log("Tip: set FULL_DEMO=true to create all 3 markets, or MARKET_KIND=price for a JSON API market.");
+    console.log("Tip: set FULL_DEMO=true to create all 3 markets, MARKET_KIND=price for a JSON API market, or MARKET_KIND=web_fact for a Parse Website -> LLM market.");
   }
 
   writeFileSync(

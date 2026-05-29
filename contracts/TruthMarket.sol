@@ -15,20 +15,29 @@ contract TruthMarket {
     uint256 public immutable llmAgentId;
     /// @notice JSON API Request agent ID registered in Somnia platform.
     uint256 public immutable jsonApiAgentId;
+    /// @notice LLM Parse Website agent ID registered in Somnia platform.
+    uint256 public immutable parseAgentId;
     /// @notice Somnia platform contract used to create async requests.
     address constant PLATFORM = 0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776;
     /// @notice Minimum stake accepted by `placeBet`.
     uint256 constant MIN_BET = 0.01 ether;
     /// @notice Minimum fee accepted by `createMarket` and assigned as bounty.
     uint256 constant MIN_CREATION_FEE = 0.02 ether;
+    /// @notice Default validator subcommittee size used to size chained budgets.
+    uint256 constant SUBCOMMITTEE_SIZE = 3;
+    /// @notice LLM Inference cost per validator, reserved for the WEB_FACT stage 2.
+    uint256 constant COST_LLM = 0.07 ether;
 
     /// @param _llmAgentId LLM Inference agent ID from Somnia Agent Explorer.
     /// @param _jsonApiAgentId JSON API Request agent ID from Somnia Agent Explorer.
-    constructor(uint256 _llmAgentId, uint256 _jsonApiAgentId) {
+    /// @param _parseAgentId LLM Parse Website agent ID from Somnia Agent Explorer.
+    constructor(uint256 _llmAgentId, uint256 _jsonApiAgentId, uint256 _parseAgentId) {
         require(_llmAgentId != 0, "LLM agent ID required");
         require(_jsonApiAgentId != 0, "JSON agent ID required");
+        require(_parseAgentId != 0, "Parse agent ID required");
         llmAgentId = _llmAgentId;
         jsonApiAgentId = _jsonApiAgentId;
+        parseAgentId = _parseAgentId;
     }
 
     /// @notice Market lifecycle and settlement outcome.
@@ -37,7 +46,8 @@ contract TruthMarket {
     /// @notice Resolution strategy and agent used to settle a market.
     /// STATEMENT: LLM Inference judges a factual statement.
     /// PRICE: JSON API Request fetches a number and compares it to a target.
-    enum MarketKind { STATEMENT, PRICE }
+    /// WEB_FACT: LLM Parse Website extracts evidence, then LLM Inference judges it.
+    enum MarketKind { STATEMENT, PRICE, WEB_FACT }
 
     /// @notice Comparator applied to PRICE markets: fetched value CMP target -> YES.
     /// 0: >, 1: >=, 2: <, 3: <=
@@ -60,6 +70,9 @@ contract TruthMarket {
         uint8 decimals;     // scale applied by fetchUint
         uint256 target;     // threshold compared against fetched value (scaled to `decimals`)
         Comparator comparator; // comparison applied: fetched CMP target -> YES
+        // WEB_FACT markets only:
+        string sourceUrl;   // URL parsed by the Parse Website agent
+        uint256 resolveBudget; // STT reserved to fund the chained LLM stage
     }
 
     uint256 public marketCount;
@@ -67,12 +80,15 @@ contract TruthMarket {
     mapping(uint256 => mapping(address => uint256)) public yesBets;
     mapping(uint256 => mapping(address => uint256)) public noBets;
     mapping(uint256 => uint256) public requestToMarket;
+    /// @notice Evidence extracted by the Parse Website agent for WEB_FACT markets.
+    mapping(uint256 => string) public evidence;
 
     event MarketCreated(uint256 indexed id, string question, uint256 deadline, uint256 bounty);
     event BetPlaced(uint256 indexed id, address indexed bettor, bool isYes, uint256 amount);
     event MarketResolved(uint256 indexed id, Outcome outcome);
     event ResolutionText(uint256 indexed id, string text);
     event ResolutionData(uint256 indexed id, uint256 value);
+    event EvidenceExtracted(uint256 indexed id, string evidence);
     event BountyPaid(uint256 indexed id, address indexed resolver, uint256 amount);
     event Claimed(uint256 indexed id, address indexed bettor, uint256 amount);
 
@@ -129,7 +145,31 @@ contract TruthMarket {
         emit MarketCreated(id, question, deadline, msg.value);
     }
 
-    /// @notice Places a YES or NO bet on an open market.
+    /// @notice Creates a WEB_FACT market settled by chaining two Somnia agents.
+    /// @dev Resolution first calls the Parse Website agent to extract evidence
+    /// from `sourceUrl`, then the callback chains an LLM Inference request that
+    /// judges the statement using that evidence as context.
+    /// @param question Factual statement to resolve as YES/NO/UNKNOWN.
+    /// @param deadline Unix timestamp when betting closes and resolution can begin.
+    /// @param sourceUrl Web page parsed by the Parse Website agent.
+    /// @return id Newly created market ID.
+    function createWebFactMarket(
+        string calldata question,
+        uint256 deadline,
+        string calldata sourceUrl
+    ) external payable returns (uint256 id) {
+        require(deadline > block.timestamp, "Past deadline");
+        require(msg.value >= MIN_CREATION_FEE, "Creation fee");
+        require(bytes(sourceUrl).length > 0, "sourceUrl required");
+        id = ++marketCount;
+        Market storage m = markets[id];
+        m.question = question;
+        m.deadline = deadline;
+        m.bounty = msg.value;
+        m.kind = MarketKind.WEB_FACT;
+        m.sourceUrl = sourceUrl;
+        emit MarketCreated(id, question, deadline, msg.value);
+    }
     /// @param marketId Target market ID.
     /// @param isYes True for YES side, false for NO side.
     function placeBet(uint256 marketId, bool isYes) external payable {
@@ -166,6 +206,7 @@ contract TruthMarket {
         bytes memory payload;
         uint256 agentId;
         bytes4 selector;
+        uint256 sendValue = msg.value;
 
         if (m.kind == MarketKind.PRICE) {
             // JSON API Request: fetch a number and compare it to the target.
@@ -176,6 +217,28 @@ contract TruthMarket {
                 m.apiUrl,
                 m.jsonSelector,
                 m.decimals
+            );
+        } else if (m.kind == MarketKind.WEB_FACT) {
+            // Stage 1: Parse Website extracts evidence. The chained LLM stage 2
+            // is funded from `resolveBudget` reserved here and triggered inside
+            // `handleEvidence`, keeping the multi-agent pipeline self-funding.
+            uint256 llmBudget = deposit + COST_LLM * SUBCOMMITTEE_SIZE;
+            require(msg.value > llmBudget && msg.value - llmBudget >= deposit, "Insufficient deposit");
+            m.resolveBudget = llmBudget;
+            sendValue = msg.value - llmBudget;
+            agentId = parseAgentId;
+            selector = this.handleEvidence.selector;
+            string[] memory noOptions = new string[](0);
+            payload = abi.encodeWithSelector(
+                IParseWebsiteAgent.ExtractString.selector,
+                "evidence",
+                m.question,
+                noOptions,
+                m.question,
+                m.sourceUrl,
+                true,
+                uint8(SUBCOMMITTEE_SIZE),
+                uint8(70)
             );
         } else {
             // STATEMENT: LLM Inference judges the factual statement.
@@ -197,7 +260,7 @@ contract TruthMarket {
             );
         }
 
-        uint256 reqId = platform.createRequest{value: msg.value}(
+        uint256 reqId = platform.createRequest{value: sendValue}(
             agentId,
             address(this),
             selector,
@@ -284,6 +347,64 @@ contract TruthMarket {
 
         m.outcome = outcome;
         emit MarketResolved(marketId, outcome);
+    }
+
+    /// @notice Callback invoked by Somnia platform with Parse Website responses.
+    /// @dev Only `PLATFORM` can call this. On success it stores the extracted
+    /// evidence and chains an LLM Inference request (stage 2) funded from the
+    /// reserved `resolveBudget`; the LLM verdict lands in `handleResolution`.
+    /// @param requestId Platform request ID created in `resolveMarket`.
+    /// @param responses Validator responses returned by the platform.
+    /// @param status Global request status.
+    function handleEvidence(
+        uint256 requestId,
+        Response[] memory responses,
+        ResponseStatus status,
+        Request memory
+    ) external {
+        require(msg.sender == PLATFORM, "Unauthorized");
+        uint256 marketId = requestToMarket[requestId];
+        require(marketId != 0, "Unknown request");
+
+        Market storage m = markets[marketId];
+
+        if (status == ResponseStatus.Success && responses.length > 0) {
+            string memory ev = abi.decode(responses[0].result, (string));
+            evidence[marketId] = ev;
+            emit EvidenceExtracted(marketId, ev);
+
+            string[] memory allowed = new string[](3);
+            allowed[0] = "YES";
+            allowed[1] = "NO";
+            allowed[2] = "UNKNOWN";
+            bytes memory payload = abi.encodeWithSelector(
+                ILLMAgent.inferString.selector,
+                string.concat(
+                    "Statement: ",
+                    m.question,
+                    "\nEvidence from source: ",
+                    ev,
+                    "\nIs the statement true? Answer YES, NO, or UNKNOWN."
+                ),
+                "You are a fact-checking oracle. Use ONLY the evidence provided.",
+                false,
+                allowed
+            );
+
+            uint256 budget = m.resolveBudget;
+            m.resolveBudget = 0;
+            uint256 newReq = IAgentRequester(PLATFORM).createRequest{value: budget}(
+                llmAgentId,
+                address(this),
+                this.handleResolution.selector,
+                payload
+            );
+            m.requestId = newReq;
+            requestToMarket[newReq] = marketId;
+        } else {
+            m.outcome = Outcome.UNKNOWN;
+            emit MarketResolved(marketId, Outcome.UNKNOWN);
+        }
     }
 
     /// @notice Applies a PRICE market comparator: `value comparator target`.

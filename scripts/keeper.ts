@@ -26,10 +26,10 @@ const SCAN_MS = Number(process.env.KEEPER_SCAN_MS ?? 10_000);
 const TOPUP_STT = process.env.RESOLVE_TOPUP_STT ?? "1.2";
 
 // Market struct field order from TruthMarket.sol (only the leading fields are
-// read here; trailing PRICE fields are ignored):
+// read here; trailing PRICE/WEB_FACT fields are ignored):
 // [question, deadline, yesPool, noPool, outcome, requestId, bounty, resolver,
-//  kind, apiUrl, jsonSelector, decimals, target, comparator]
-type MarketTuple = readonly [string, bigint, bigint, bigint, number, bigint, bigint, string, ...unknown[]];
+//  kind, apiUrl, jsonSelector, decimals, target, comparator, sourceUrl, resolveBudget]
+type MarketTuple = readonly [string, bigint, bigint, bigint, number, bigint, bigint, string, number, ...unknown[]];
 
 /**
  * Runs an autonomous keeper loop that resolves expired, still-open markets.
@@ -67,6 +67,7 @@ async function main() {
       const outcome = m[4];
       const requestId = m[5];
       const bounty = m[6];
+      const kind = m[8];
 
       const isOpen = outcome === 0;        // Outcome.Open
       const expired = deadline > 0n && nowSec >= deadline;
@@ -75,21 +76,23 @@ async function main() {
       if (!(isOpen && expired && unrequested)) continue;
 
       inFlight.add(key);
-      void resolve(id, bounty).finally(() => inFlight.delete(key));
+      void resolve(id, bounty, kind).finally(() => inFlight.delete(key));
     }
   }
 
   /**
    * Submits resolveMarket and then waits for asynchronous settlement.
    */
-  async function resolve(id: bigint, bounty: bigint) {
+  async function resolve(id: bigint, bounty: bigint, kind: number) {
     try {
       const deposit = (await publicClient.readContract({
         address: PLATFORM,
         abi: PLATFORM_ABI,
         functionName: "getRequestDeposit",
       })) as bigint;
-      const value = deposit + parseEther(TOPUP_STT);
+      // WEB_FACT (kind 2) chains two agent requests, so it needs a larger top-up.
+      const topup = kind === 2 ? (process.env.RESOLVE_TOPUP_STT ?? "2.0") : TOPUP_STT;
+      const value = deposit + parseEther(topup);
 
       console.log(`→ Market #${id} expired. Resolving autonomously (bounty ${bounty} wei)...`);
       const hash = await contract.write.resolveMarket([id], { value });
