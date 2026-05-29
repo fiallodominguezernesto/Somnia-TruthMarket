@@ -419,7 +419,7 @@ function resolutionStatus(outcome, requestId, deadline, resolver) {
     const by = resolver && resolver !== ZERO_ADDRESS ? ` (resolved by ${resolver})` : "";
     return `Settled${by}`;
   }
-  if (requestId !== 0n) return "Resolution requested — awaiting LLM callback";
+  if (requestId !== 0n) return "Resolution requested — awaiting agent callback";
   if (deadline > 0n && now >= deadline) return "Expired — awaiting keeper/agent to resolve";
   return "Open — accepting bets";
 }
