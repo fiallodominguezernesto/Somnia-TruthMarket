@@ -25,9 +25,11 @@ const SCAN_MS = Number(process.env.KEEPER_SCAN_MS ?? 10_000);
 // Top-up sent on top of the platform deposit, same convention as resolveMarket.ts.
 const TOPUP_STT = process.env.RESOLVE_TOPUP_STT ?? "1.2";
 
-// Market struct field order from TruthMarket.sol:
-// [question, deadline, yesPool, noPool, outcome, requestId, bounty, resolver]
-type MarketTuple = readonly [string, bigint, bigint, bigint, number, bigint, bigint, string];
+// Market struct field order from TruthMarket.sol (only the leading fields are
+// read here; trailing PRICE fields are ignored):
+// [question, deadline, yesPool, noPool, outcome, requestId, bounty, resolver,
+//  kind, apiUrl, jsonSelector, decimals, target, comparator]
+type MarketTuple = readonly [string, bigint, bigint, bigint, number, bigint, bigint, string, ...unknown[]];
 
 /**
  * Runs an autonomous keeper loop that resolves expired, still-open markets.

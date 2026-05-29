@@ -117,3 +117,15 @@ interface ILLMAgent {
         string[] calldata allowedValues
     ) external returns (string memory response);
 }
+
+// JSON API Request base agent. Fetches a public HTTP endpoint and extracts a
+// numeric value with a JSON-path-like selector (e.g. "bitcoin.usd"), scaled by
+// `decimals`. Payload must be function calldata (selector + args).
+interface IJsonApiAgent {
+    /// @notice Fetches `url`, extracts `selector` and returns it scaled to `decimals`.
+    function fetchUint(
+        string calldata url,
+        string calldata selector,
+        uint8 decimals
+    ) external returns (uint256 value);
+}

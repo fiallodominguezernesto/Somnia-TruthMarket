@@ -35,6 +35,7 @@ async function pollResolution(
   const deadline = Date.now() + TIMEOUT_MS;
   const event = parseAbiItem("event MarketResolved(uint256 indexed id, uint8 outcome)");
   const textEvent = parseAbiItem("event ResolutionText(uint256 indexed id, string text)");
+  const dataEvent = parseAbiItem("event ResolutionData(uint256 indexed id, uint256 value)");
 
   let searchFrom = startBlock;
 
@@ -66,6 +67,16 @@ async function pollResolution(
         });
         if (textLogs.length > 0) {
           console.log(`LLM text: ${textLogs[textLogs.length - 1].args.text}`);
+        }
+        const dataLogs = await publicClient.getLogs({
+          address: contractAddress,
+          event: dataEvent,
+          args: { id: marketId },
+          fromBlock: from,
+          toBlock: to,
+        });
+        if (dataLogs.length > 0) {
+          console.log(`JSON API value: ${dataLogs[dataLogs.length - 1].args.value}`);
         }
         console.log(`\n✅ Market #${marketId} resolved → ${outcome}`);
         return outcome;
