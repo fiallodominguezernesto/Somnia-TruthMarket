@@ -55,7 +55,14 @@ The three agent IDs are already pre-filled in `.env.example` (so you usually onl
 Optional pre-check (no deployment):
 
 ```bash
+# default: statement (LLM Inference)
 npm run sim-platform
+
+# price (JSON API Request)
+AGENT=price npm run sim-platform
+
+# web_fact (LLM Parse Website)
+AGENT=web_fact npm run sim-platform
 ```
 
 `sim-platform` works before deploy and does not require `scripts/deployed.json`.
@@ -86,7 +93,7 @@ npm run claim
 ```
 
 What to expect:
-- `sim-platform` validates `LLM_AGENT_ID` before deploy.
+- `sim-platform` validates all 3 agent IDs before deploy (`AGENT=statement|price|web_fact`).
 - Deploy prints new contract address.
 - Create writes market ids to `scripts/markets.json`.
 - Create includes resolver bounty fee (`0.02 STT` default).

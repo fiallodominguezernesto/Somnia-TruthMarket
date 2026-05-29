@@ -65,7 +65,15 @@ curl -L https://foundry.paradigm.xyz | bash
 7. Validate environment before deploy:
 
 ```bash
+# default: statement (LLM Inference)
 npm run sim-platform
+
+# price (JSON API Request)
+AGENT=price npm run sim-platform
+
+# web_fact (LLM Parse Website)
+AGENT=web_fact npm run sim-platform
+
 npm run build
 ```
 
@@ -83,10 +91,17 @@ The agent IDs ship pre-filled in `.env.example`. To confirm or replace one, open
 Optional validation before deploy:
 
 ```bash
+# default: statement (LLM Inference)
 npm run sim-platform
+
+# price (JSON API Request)
+AGENT=price npm run sim-platform
+
+# web_fact (LLM Parse Website)
+AGENT=web_fact npm run sim-platform
 ```
 
-`sim-platform` works before deploy and does not require `scripts/deployed.json`.
+`sim-platform` works before deploy and does not require `scripts/deployed.json`. Use `AGENT=statement|price|web_fact` to dry-run each Somnia base agent.
 
 Commands:
 
@@ -326,7 +341,15 @@ curl -L https://foundry.paradigm.xyz | bash
 7. Valida el entorno antes del deploy:
 
 ```bash
+# por defecto: statement (LLM Inference)
 npm run sim-platform
+
+# price (JSON API Request)
+AGENT=price npm run sim-platform
+
+# web_fact (LLM Parse Website)
+AGENT=web_fact npm run sim-platform
+
 npm run build
 ```
 
@@ -344,10 +367,17 @@ Los IDs de agente vienen pre-rellenados en `.env.example`. Para confirmar o reem
 Validacion opcional antes de deploy:
 
 ```bash
+# por defecto: statement (LLM Inference)
 npm run sim-platform
+
+# price (JSON API Request)
+AGENT=price npm run sim-platform
+
+# web_fact (LLM Parse Website)
+AGENT=web_fact npm run sim-platform
 ```
 
-`sim-platform` funciona antes del deploy y no requiere `scripts/deployed.json`.
+`sim-platform` funciona antes del deploy y no requiere `scripts/deployed.json`. Usa `AGENT=statement|price|web_fact` para simular cada agente base de Somnia.
 
 Comandos:
 
